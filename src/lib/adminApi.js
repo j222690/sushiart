@@ -1,0 +1,245 @@
+import { supabase, friendlyError } from './supabase';
+
+function unwrap({ data, error }, fallback) {
+  if (error) throw new Error(friendlyError(error, fallback));
+  return data;
+}
+
+/** Genérico para os CRUDs simples do painel (categorias, cupons, banners...). */
+function crud(table, defaultOrder = 'created_at') {
+  return {
+    async list(order = defaultOrder, ascending = true) {
+      return unwrap(
+        await supabase.from(table).select('*').order(order, { ascending }),
+        `Não foi possível carregar ${table}.`
+      );
+    },
+    async create(row) {
+      return unwrap(await supabase.from(table).insert(row).select().single(), 'Não foi possível criar.');
+    },
+    async update(id, patch) {
+      return unwrap(
+        await supabase.from(table).update(patch).eq('id', id).select().single(),
+        'Não foi possível salvar.'
+      );
+    },
+    async remove(id) {
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw new Error(friendlyError(error, 'Não foi possível excluir.'));
+    },
+  };
+}
+
+export const adminCategories = crud('categories', 'sort_order');
+export const adminBanners = crud('banners', 'sort_order');
+export const adminOffers = crud('offers', 'sort_order');
+export const adminCoupons = crud('coupons', 'created_at');
+export const adminPrizes = crud('roulette_prizes', 'sort_order');
+export const adminZones = crud('delivery_zones', 'neighborhood');
+export const adminHours = crud('business_hours', 'weekday');
+
+// ---------------------------------------------------------------------------
+// Produtos e adicionais
+// ---------------------------------------------------------------------------
+export const adminProducts = {
+  ...crud('products', 'sort_order'),
+
+  async listWithCategory() {
+    return unwrap(
+      await supabase
+        .from('products')
+        .select('*, categories(name, slug)')
+        .order('sort_order'),
+      'Não foi possível carregar os produtos.'
+    );
+  },
+
+  /** Atalho do "esgotado hoje" — o botão mais usado durante o serviço. */
+  async toggleSoldOut(id, soldOut) {
+    return unwrap(
+      await supabase.from('products').update({ sold_out: soldOut }).eq('id', id).select().single(),
+      'Não foi possível atualizar o produto.'
+    );
+  },
+
+  async addonGroups(productId) {
+    return unwrap(
+      await supabase
+        .from('addon_groups')
+        .select('*, product_addons(*)')
+        .eq('product_id', productId)
+        .order('sort_order'),
+      'Não foi possível carregar os adicionais.'
+    );
+  },
+
+  async createAddonGroup(group) {
+    return unwrap(
+      await supabase.from('addon_groups').insert(group).select().single(),
+      'Não foi possível criar o grupo.'
+    );
+  },
+
+  async removeAddonGroup(id) {
+    const { error } = await supabase.from('addon_groups').delete().eq('id', id);
+    if (error) throw new Error(friendlyError(error));
+  },
+
+  async saveAddon(addon) {
+    const query = addon.id
+      ? supabase.from('product_addons').update(addon).eq('id', addon.id)
+      : supabase.from('product_addons').insert(addon);
+    return unwrap(await query.select().single(), 'Não foi possível salvar o adicional.');
+  },
+
+  async removeAddon(id) {
+    const { error } = await supabase.from('product_addons').delete().eq('id', id);
+    if (error) throw new Error(friendlyError(error));
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Pedidos
+// ---------------------------------------------------------------------------
+export const adminOrders = {
+  async list({ statuses, from, to, limit = 100 } = {}) {
+    let query = supabase
+      .from('orders')
+      .select('*, order_items(*), customers(name, phone)')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (statuses?.length) query = query.in('status', statuses);
+    if (from) query = query.gte('created_at', from);
+    if (to) query = query.lte('created_at', to);
+
+    return unwrap(await query, 'Não foi possível carregar os pedidos.');
+  },
+
+  async get(id) {
+    return unwrap(
+      await supabase
+        .from('orders')
+        .select('*, order_items(*), customers(name, phone, email), order_status_history(status, created_at)')
+        .eq('id', id)
+        .single(),
+      'Pedido não encontrado.'
+    );
+  },
+
+  async setStatus(id, status, note = null) {
+    const { error } = await supabase.rpc('admin_set_order_status', {
+      p_order_id: id,
+      p_status: status,
+      p_note: note,
+    });
+    if (error) throw new Error(friendlyError(error, 'Não foi possível mudar o status.'));
+  },
+
+  /** Confirma manualmente um Pix/cartão que caiu fora do webhook. */
+  async markPaidManually(id) {
+    return unwrap(
+      await supabase
+        .from('orders')
+        .update({ payment_status: 'pago', status: 'pago', paid_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single(),
+      'Não foi possível confirmar o pagamento.'
+    );
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Configurações
+// ---------------------------------------------------------------------------
+export const adminSettings = {
+  async restaurant() {
+    return unwrap(
+      await supabase.from('restaurant_settings').select('*').eq('id', 1).single(),
+      'Não foi possível carregar as configurações.'
+    );
+  },
+
+  async saveRestaurant(patch) {
+    return unwrap(
+      await supabase.from('restaurant_settings').update(patch).eq('id', 1).select().single(),
+      'Não foi possível salvar.'
+    );
+  },
+
+  async paymentConfig() {
+    return unwrap(
+      await supabase.from('payment_config').select('*').order('sort_order'),
+      'Não foi possível carregar o roteador de pagamentos.'
+    );
+  },
+
+  async savePaymentConfig(method, patch) {
+    return unwrap(
+      await supabase.from('payment_config').update(patch).eq('method', method).select().single(),
+      'Não foi possível salvar a configuração de pagamento.'
+    );
+  },
+
+  async rouletteConfig() {
+    return unwrap(
+      await supabase.from('roulette_config').select('*').eq('id', 1).single(),
+      'Não foi possível carregar a roleta.'
+    );
+  },
+
+  async saveRouletteConfig(patch) {
+    return unwrap(
+      await supabase.from('roulette_config').update(patch).eq('id', 1).select().single(),
+      'Não foi possível salvar.'
+    );
+  },
+
+  async loyaltyConfig() {
+    return unwrap(
+      await supabase.from('loyalty_config').select('*').eq('id', 1).single(),
+      'Não foi possível carregar a fidelidade.'
+    );
+  },
+
+  async saveLoyaltyConfig(patch) {
+    return unwrap(
+      await supabase.from('loyalty_config').update(patch).eq('id', 1).select().single(),
+      'Não foi possível salvar.'
+    );
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Relatórios
+// ---------------------------------------------------------------------------
+export const adminReports = {
+  async summary(from, to) {
+    return unwrap(await supabase.rpc('report_summary', { p_from: from, p_to: to }), 'Relatório indisponível.');
+  },
+  async byPayment(from, to) {
+    return unwrap(await supabase.rpc('report_by_payment', { p_from: from, p_to: to }), 'Relatório indisponível.');
+  },
+  async cash(from, to) {
+    return unwrap(
+      await supabase.rpc('report_cash_reconciliation', { p_from: from, p_to: to }),
+      'Relatório indisponível.'
+    );
+  },
+  async topProducts(from, to, limit = 15) {
+    return unwrap(
+      await supabase.rpc('report_top_products', { p_from: from, p_to: to, p_limit: limit }),
+      'Relatório indisponível.'
+    );
+  },
+  async daily(from, to) {
+    return unwrap(await supabase.rpc('report_daily_revenue', { p_from: from, p_to: to }), 'Relatório indisponível.');
+  },
+  async promotions(from, to) {
+    return unwrap(await supabase.rpc('report_promotions', { p_from: from, p_to: to }), 'Relatório indisponível.');
+  },
+  async customers(from, to) {
+    return unwrap(await supabase.rpc('report_customers', { p_from: from, p_to: to }), 'Relatório indisponível.');
+  },
+};

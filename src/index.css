@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-ink text-cream font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+
+  /* Tipografia de marca */
+  h1,
+  h2,
+  h3 {
+    @apply font-brand;
+  }
+
+  /* Scrollbar discreta no tema escuro */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-ink;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-ink-50 rounded-full;
+  }
+
+  /* Foco visível e consistente (acessibilidade) */
+  :focus-visible {
+    @apply outline-none ring-2 ring-vinho-400 ring-offset-2 ring-offset-ink;
+  }
+
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+@layer components {
+  /* Faixa segura para o bottom nav em iPhone */
+  .safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Skeleton de carregamento com brilho */
+  .skeleton {
+    @apply relative overflow-hidden bg-ink-300;
+  }
+  .skeleton::after {
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    content: '';
+    background-image: linear-gradient(
+      90deg,
+      rgba(245, 241, 234, 0) 0,
+      rgba(245, 241, 234, 0.06) 50%,
+      rgba(245, 241, 234, 0) 100%
+    );
+  }
+}

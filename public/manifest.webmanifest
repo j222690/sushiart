@@ -1,0 +1,17 @@
+{
+  "name": "Sushi Art — Empório do Sushi",
+  "short_name": "Sushi Art",
+  "description": "Amor em forma de sushi. Peça online em Chapecó/SC.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0D0D0D",
+  "theme_color": "#0D0D0D",
+  "categories": ["food", "shopping"],
+  "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

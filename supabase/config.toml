@@ -1,0 +1,37 @@
+project_id = "sushi-art-delivery"
+
+# ---------------------------------------------------------------------------
+# Edge Functions
+#
+# Por padrão o Supabase exige um JWT válido para invocar uma function. Isso é o
+# que queremos em `create-payment` (só o cliente logado cria a própria cobrança),
+# mas quebraria os webhooks: nenhum gateway tem como enviar um JWT do nosso
+# projeto. Neles a autenticação é feita DENTRO da função, e em todos os casos
+# quem libera o pedido é uma consulta de volta à API do gateway — não o corpo
+# do aviso recebido.
+#
+#   InfinitePay   → `payment_check` na API deles
+#   Asaas         → header `asaas-access-token`
+#   Mercado Pago  → HMAC do header `x-signature` + consulta do pagamento
+#   PagBank       → hash do header `x-authenticity-token` + consulta do pedido
+#
+# `send-push` também fica sem JWT: quem chama é o BANCO (trigger com pg_net),
+# que não tem sessão de usuário. A função confere o header `x-push-secret`.
+# ---------------------------------------------------------------------------
+[functions.create-payment]
+verify_jwt = true
+
+[functions.webhook-infinitepay]
+verify_jwt = false
+
+[functions.webhook-asaas]
+verify_jwt = false
+
+[functions.webhook-mercadopago]
+verify_jwt = false
+
+[functions.webhook-pagbank]
+verify_jwt = false
+
+[functions.send-push]
+verify_jwt = false
