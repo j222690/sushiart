@@ -7,10 +7,11 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0D0D0D",
-  "theme_color": "#0D0D0D",
+  "background_color": "#F6F3EF",
+  "theme_color": "#F6F3EF",
   "categories": ["food", "shopping"],
   "icons": [
+    { "src": "/logo-sushiart.jpg", "sizes": "150x150", "type": "image/jpeg", "purpose": "any" },
     { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ]
