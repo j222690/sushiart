@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Trash2, Store, Clock, Bike, Save } from 'lucide-react';
+import { Plus, Trash2, Store, Clock, Bike, Save, MapPinned} from 'lucide-react';
 import { Badge, Button, Card, Input, Skeleton, Switch } from '../../components/ui';
 import ImageUpload from '../../components/admin/ImageUpload';
 import { adminSettings, adminZones, adminHours } from '../../lib/adminApi';
@@ -313,7 +313,19 @@ export default function Settings() {
           </h2>
 
           <p className="mb-3 text-xs text-cream-faint">
-            Bairro não cadastrado = fora da área. O cliente vê isso antes de tentar fechar o pedido.
+            Bairro fora desta lista não bloqueia o pedido: ele entra marcado como{' '}
+            <span className="text-ember">taxa a combinar</span> e aparece assim no kanban, para
+            vocês fecharem o valor por telefone.
+          </p>
+
+          <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-ink-300 p-2.5 text-[11px] text-cream-faint">
+            <MapPinned size={13} className="mt-0.5 shrink-0 text-vinho-300" />
+            <span>
+              O campo de <span className="text-cream-muted">apelidos</span> existe porque o mapa
+              devolve o bairro com a grafia do OpenStreetMap, que nem sempre bate com a de vocês.
+              Cadastre ali as variações que aparecerem (ex.: <em>Efapi, EFAPI, Vila Efapi</em>) e o
+              pedido passa a casar sozinho. Separe por vírgula.
+            </span>
           </p>
 
           <div className="mb-4 max-h-96 space-y-2 overflow-y-auto pr-1">
@@ -352,6 +364,23 @@ export default function Settings() {
                   checked={zone.active}
                   onChange={(v) => updateZone(zone, { active: v })}
                   label=""
+                />
+
+                <input
+                  type="text"
+                  defaultValue={(zone.aliases ?? []).join(', ')}
+                  onBlur={(e) => {
+                    const lista = e.target.value
+                      .split(',')
+                      .map((t) => t.trim())
+                      .filter(Boolean);
+                    if (lista.join('|') !== (zone.aliases ?? []).join('|')) {
+                      updateZone(zone, { aliases: lista });
+                    }
+                  }}
+                  placeholder="apelidos do mapa"
+                  aria-label={`Apelidos de ${zone.neighborhood}`}
+                  className="h-9 w-full min-w-0 rounded-lg border border-line bg-ink-500 px-2 text-xs text-cream-muted placeholder:text-cream-faint"
                 />
 
                 <button

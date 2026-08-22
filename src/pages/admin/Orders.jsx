@@ -205,6 +205,9 @@ export default function AdminOrders() {
             : ''
         }</div>
         ${
+          (order.fee_to_arrange
+            ? '<div style="font-weight:700">** TAXA DE ENTREGA A COMBINAR **</div>'
+            : '') +
           ON_DELIVERY_KINDS[order.on_delivery_kind]?.machine
             ? '<div style="font-weight:700">** LEVAR MAQUININHA **</div>'
             : ''
@@ -322,6 +325,11 @@ export default function AdminOrders() {
                         </div>
 
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {/* Bairro fora do cadastro: alguém precisa ligar e
+                              combinar o frete ANTES de o entregador sair. Se
+                              este aviso passar batido, a entrega sai de graça. */}
+                          {order.fee_to_arrange && <Badge tone="warning">Taxa a combinar</Badge>}
+
                           {onDelivery ? (
                             // Maquininha vira alerta laranja: se o entregador
                             // sair sem ela, a entrega não se completa.
