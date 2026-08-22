@@ -4,7 +4,10 @@ import { Switch } from '../ui';
 import { notifications as api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { disablePush, isPushEnabled, pushConfigured, pushSupported, requestPushPermission } from '../../lib/push';
+import {
+  disablePush, isPushEnabled, pushConfigured, pushPrecisaInstalarNoIos,
+  pushSupported, requestPushPermission,
+} from '../../lib/push';
 
 /**
  * Liga os avisos de pedido novo NESTE aparelho.
@@ -36,6 +39,24 @@ export default function PushToggle({ compact = false }) {
 
   // Sem staff não há o que ligar: a RLS recusaria o registro como 'equipe'.
   if (!staff || !suportado || !checked) return null;
+
+  // No iPhone fora da tela de início, ligar não adianta: o Safari aceita a
+  // permissão e não entrega nada. Melhor explicar do que deixar a pessoa achar
+  // que ligou e depois perder pedido.
+  if (pushPrecisaInstalarNoIos()) {
+    return (
+      <div className={compact ? 'rounded-xl border border-line bg-ink-500 p-3' : ''}>
+        <div className="flex items-start gap-2.5">
+          <Bell size={16} className="mt-0.5 shrink-0 text-cream-faint" />
+          <p className="text-[11px] leading-relaxed text-cream-faint">
+            Para receber aviso de pedido novo no iPhone, toque em{' '}
+            <span className="text-cream-muted">Compartilhar → Adicionar à Tela de Início</span> e
+            abra o painel por lá.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   async function alternar(proximo) {
     setBusy(true);

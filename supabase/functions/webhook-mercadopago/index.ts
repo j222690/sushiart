@@ -59,7 +59,128 @@ async function assinaturaValida(req: Request, dataId: string): Promise<boolean> 
   return safeEqual(esperado, partes.v1);
 }
 
+/**
+ * Confirma o pagamento NA FONTE e move o pedido.
+ *
+ * Compartilhada pelos dois formatos de aviso do Mercado Pago (POST assinado e
+ * GET no estilo IPN antigo). Concentrar aqui é o que garante que o caminho
+ * antigo passe pelas mesmas conferências de status e de valor que o novo —
+ * um deles ficar mais frouxo que o outro seria a forma mais fácil de abrir
+ * um buraco sem perceber.
+ */
+async function confirmar(paymentId: string): Promise<Response> {
+  try {
+  // ----------------------------------------------------------------------
+  // Confirmação na fonte.
+  // ----------------------------------------------------------------------
+  const resposta = await fetch(`${MP_API}/v1/payments/${paymentId}`, {
+    headers: { Authorization: `Bearer ${requireEnv('MERCADOPAGO_ACCESS_TOKEN')}` },
+  });
+
+  const pagamento = await resposta.json().catch(() => ({}));
+  if (!resposta.ok) {
+    console.error('webhook-mercadopago: falha ao consultar', resposta.status, pagamento);
+    // 500 para o MP tentar de novo — pode ter sido instabilidade da API.
+    return json({ error: 'Não foi possível consultar o pagamento.' }, 500);
+  }
+
+  const orderId = pagamento.external_reference;
+  if (!orderId) {
+    console.warn('webhook-mercadopago: pagamento sem external_reference', paymentId);
+    return json({ received: true, ignored: 'sem external_reference' });
+  }
+
+  const admin = serviceClient();
+  const { data: order } = await admin
+    .from('orders')
+    .select('id, code, total_cents, payment_status')
+    .eq('id', orderId)
+    .single();
+
+  if (!order) {
+    console.warn('webhook-mercadopago: pedido não encontrado', orderId);
+    return json({ received: true, ignored: 'pedido não encontrado' });
+  }
+
+  const status = String(pagamento.status ?? '');
+
+  if (['rejected', 'cancelled', 'refunded', 'charged_back'].includes(status)) {
+    await admin.rpc('mark_order_payment_failed', {
+      p_order_id: order.id,
+      p_reason: `Mercado Pago: ${pagamento.status_detail ?? status}`,
+    });
+    return json({ received: true, status });
+  }
+
+  if (status !== 'approved') {
+    // 'pending' / 'in_process': o MP avisa de novo quando resolver.
+    return json({ received: true, ignored: status });
+  }
+
+  if (order.payment_status === 'pago') {
+    return json({ received: true, already_paid: true });
+  }
+
+  // O MP devolve reais decimais; nosso banco guarda centavos.
+  const pagoCentavos = Math.round(
+    Number(pagamento.transaction_details?.total_paid_amount ?? pagamento.transaction_amount ?? 0) *
+      100
+  );
+
+  if (pagoCentavos < order.total_cents) {
+    console.error(
+      `Valor divergente no pedido ${order.code}: pago ${pagoCentavos}, esperado ${order.total_cents}`
+    );
+    return json({ received: true, ignored: 'valor divergente' });
+  }
+
+  await admin.rpc('mark_order_paid', {
+    p_order_id: order.id,
+    p_provider: 'mercadopago',
+    p_reference: String(pagamento.id),
+    p_payload: {
+      mercadopago_status: status,
+      payment_type: pagamento.payment_type_id ?? null,
+      installments: pagamento.installments ?? null,
+      net_amount: pagamento.transaction_details?.net_received_amount ?? null,
+      receipt_url: pagamento.transaction_details?.external_resource_url ?? null,
+    },
+  });
+
+  // No Checkout Pro quem escolhe o parcelamento é o cliente, na tela do MP —
+  // o número real só se conhece agora.
+  const parcelas = Number(pagamento.installments ?? 0);
+  if (parcelas > 1) {
+    await admin.from('orders').update({ installments: parcelas }).eq('id', order.id);
+  }
+
+  console.log(`Pedido ${order.code} confirmado via Mercado Pago.`);
+  return json({ received: true });
+  } catch (error) {
+    console.error('webhook-mercadopago confirmar:', error);
+    return json({ error: (error as Error).message }, 500);
+  }
+}
+
 Deno.serve(async (req) => {
+  const url = new URL(req.url);
+
+  // Notificação no formato IPN antigo: `GET ...?topic=payment&id=123`.
+  // O Mercado Pago ainda dispara este formato dependendo de como a conta foi
+  // configurada. Recusar com 405 significaria pedido pago que nunca sai de
+  // `aguardando_pagamento` — e ninguém descobre até o cliente reclamar.
+  if (req.method === 'GET') {
+    const topico = url.searchParams.get('topic') ?? url.searchParams.get('type');
+    const id = url.searchParams.get('id') ?? url.searchParams.get('data.id');
+
+    if (topico !== 'payment' || !id) {
+      return json({ received: true, ignored: topico ?? 'sem topico' });
+    }
+    // Sem corpo não há assinatura para conferir; a confirmação na fonte, que é
+    // quem realmente libera o pedido, acontece igual dentro de `confirmar`.
+    return confirmar(id);
+  }
+
   if (req.method !== 'POST') return json({ error: 'Método não permitido.' }, 405);
 
   try {
@@ -72,7 +193,6 @@ Deno.serve(async (req) => {
     }
 
     // O id do pagamento vem no corpo e também na query, dependendo do formato.
-    const url = new URL(req.url);
     const paymentId = String(
       url.searchParams.get('data.id') ?? evento.data?.id ?? evento.resource ?? ''
     );
@@ -83,92 +203,7 @@ Deno.serve(async (req) => {
       return json({ error: 'Não autorizado.' }, 401);
     }
 
-    // ----------------------------------------------------------------------
-    // Confirmação na fonte.
-    // ----------------------------------------------------------------------
-    const resposta = await fetch(`${MP_API}/v1/payments/${paymentId}`, {
-      headers: { Authorization: `Bearer ${requireEnv('MERCADOPAGO_ACCESS_TOKEN')}` },
-    });
-
-    const pagamento = await resposta.json().catch(() => ({}));
-    if (!resposta.ok) {
-      console.error('webhook-mercadopago: falha ao consultar', resposta.status, pagamento);
-      // 500 para o MP tentar de novo — pode ter sido instabilidade da API.
-      return json({ error: 'Não foi possível consultar o pagamento.' }, 500);
-    }
-
-    const orderId = pagamento.external_reference;
-    if (!orderId) {
-      console.warn('webhook-mercadopago: pagamento sem external_reference', paymentId);
-      return json({ received: true, ignored: 'sem external_reference' });
-    }
-
-    const admin = serviceClient();
-    const { data: order } = await admin
-      .from('orders')
-      .select('id, code, total_cents, payment_status')
-      .eq('id', orderId)
-      .single();
-
-    if (!order) {
-      console.warn('webhook-mercadopago: pedido não encontrado', orderId);
-      return json({ received: true, ignored: 'pedido não encontrado' });
-    }
-
-    const status = String(pagamento.status ?? '');
-
-    if (['rejected', 'cancelled', 'refunded', 'charged_back'].includes(status)) {
-      await admin.rpc('mark_order_payment_failed', {
-        p_order_id: order.id,
-        p_reason: `Mercado Pago: ${pagamento.status_detail ?? status}`,
-      });
-      return json({ received: true, status });
-    }
-
-    if (status !== 'approved') {
-      // 'pending' / 'in_process': o MP avisa de novo quando resolver.
-      return json({ received: true, ignored: status });
-    }
-
-    if (order.payment_status === 'pago') {
-      return json({ received: true, already_paid: true });
-    }
-
-    // O MP devolve reais decimais; nosso banco guarda centavos.
-    const pagoCentavos = Math.round(
-      Number(pagamento.transaction_details?.total_paid_amount ?? pagamento.transaction_amount ?? 0) *
-        100
-    );
-
-    if (pagoCentavos < order.total_cents) {
-      console.error(
-        `Valor divergente no pedido ${order.code}: pago ${pagoCentavos}, esperado ${order.total_cents}`
-      );
-      return json({ received: true, ignored: 'valor divergente' });
-    }
-
-    await admin.rpc('mark_order_paid', {
-      p_order_id: order.id,
-      p_provider: 'mercadopago',
-      p_reference: String(pagamento.id),
-      p_payload: {
-        mercadopago_status: status,
-        payment_type: pagamento.payment_type_id ?? null,
-        installments: pagamento.installments ?? null,
-        net_amount: pagamento.transaction_details?.net_received_amount ?? null,
-        receipt_url: pagamento.transaction_details?.external_resource_url ?? null,
-      },
-    });
-
-    // No Checkout Pro quem escolhe o parcelamento é o cliente, na tela do MP —
-    // o número real só se conhece agora.
-    const parcelas = Number(pagamento.installments ?? 0);
-    if (parcelas > 1) {
-      await admin.from('orders').update({ installments: parcelas }).eq('id', order.id);
-    }
-
-    console.log(`Pedido ${order.code} confirmado via Mercado Pago.`);
-    return json({ received: true });
+    return confirmar(paymentId);
   } catch (error) {
     console.error('webhook-mercadopago:', error);
     return json({ error: (error as Error).message }, 500);

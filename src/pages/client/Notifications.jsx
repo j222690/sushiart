@@ -6,7 +6,7 @@ import { Button, Card, EmptyState, Skeleton } from '../../components/ui';
 import { notifications as api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { pushSupported, requestPushPermission } from '../../lib/push';
+import { pushPrecisaInstalarNoIos, pushSupported, requestPushPermission } from '../../lib/push';
 import { timeAgo } from '../../lib/format';
 
 export default function Notifications() {
@@ -32,8 +32,13 @@ export default function Notifications() {
       .catch(() => setRows([]));
   }, [user, navigate]);
 
+  const precisaInstalarIos = pushSupported() && pushPrecisaInstalarNoIos();
+
   const canAskPush =
-    pushSupported() && 'Notification' in window && Notification.permission === 'default';
+    pushSupported() &&
+    !precisaInstalarIos &&
+    'Notification' in window &&
+    Notification.permission === 'default';
 
   return (
     <div className="px-4 pb-8 pt-4">
@@ -46,6 +51,17 @@ export default function Notifications() {
       </button>
 
       <h1 className="mb-4 font-brand text-2xl text-cream">Notificações</h1>
+
+      {precisaInstalarIos && (
+        <Card className="mb-4 flex items-start gap-3 border-vinho-500/30 p-4">
+          <Bell size={20} className="mt-0.5 shrink-0 text-vinho-300" />
+          <p className="min-w-0 flex-1 text-xs leading-relaxed text-cream-muted">
+            No iPhone, os avisos do pedido só chegam com o app na tela de início. Toque em{' '}
+            <span className="text-cream">Compartilhar → Adicionar à Tela de Início</span> e abra
+            por lá.
+          </p>
+        </Card>
+      )}
 
       {canAskPush && (
         <Card className="mb-4 flex items-center gap-3 border-vinho-500/30 p-4">

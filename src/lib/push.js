@@ -39,6 +39,28 @@ export function pushConfigured() {
 }
 
 /**
+ * No iPhone e no iPad, Web Push só funciona com o app instalado na tela de
+ * início — numa aba do Safari o navegador aceita a permissão e não entrega
+ * nada. Sem detectar isso, a pessoa liga o aviso, não recebe nada e conclui
+ * que o app é quebrado.
+ */
+export function pushPrecisaInstalarNoIos() {
+  const ua = navigator.userAgent;
+  const ehIos =
+    /iPad|iPhone|iPod/.test(ua) ||
+    // iPadOS recente se identifica como Mac; o toque é o que o denuncia.
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  if (!ehIos) return false;
+
+  const instalado =
+    navigator.standalone === true ||
+    window.matchMedia?.('(display-mode: standalone)')?.matches === true;
+
+  return !instalado;
+}
+
+/**
  * Pega (ou cria) a inscrição deste navegador.
  *
  * Reaproveita a existente de propósito: assinar de novo geraria outro endpoint
@@ -128,6 +150,42 @@ export async function isPushEnabled(userId, audience = 'cliente') {
     if (!subscription) return false;
 
     return notifications.hasToken(userId, JSON.stringify(subscription), audience);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Regrava a inscrição deste aparelho no banco, sem pedir permissão nenhuma.
+ *
+ * Existe por um motivo específico: o endpoint de push NÃO é estável. O
+ * navegador pode rotacioná-lo sozinho (atualização, limpeza interna, troca de
+ * conta do Chrome). Quando isso acontece, a linha em `push_tokens` aponta para
+ * um endereço morto e a pessoa simplesmente para de receber aviso — sem erro,
+ * sem sinal, sem jeito de desconfiar.
+ *
+ * Rodando no carregamento do app, a linha nova entra antes de fazer falta. A
+ * antiga é apagada pelo `send-push` no primeiro 410 que o push service devolver.
+ *
+ * Silencioso de propósito: é manutenção, não ação do usuário. Se falhar, o
+ * único efeito é continuar com o registro antigo — que é o estado de hoje.
+ */
+export async function sincronizarInscricao(userId, audience = 'cliente') {
+  if (!pushSupported() || !VAPID_PUBLIC_KEY || !userId) return false;
+  if (Notification.permission !== 'granted') return false;
+
+  try {
+    const registration = await navigator.serviceWorker.getRegistration('/sw.js');
+    if (!registration) return false;
+
+    const subscription = await registration.pushManager.getSubscription();
+    if (!subscription) return false;
+
+    const token = JSON.stringify(subscription);
+    if (await notifications.hasToken(userId, token, audience)) return false;
+
+    await notifications.saveToken(userId, token, 'web', audience);
+    return true;
   } catch {
     return false;
   }

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase, friendlyError } from '../lib/supabase';
+import { sincronizarInscricao } from '../lib/push';
 
 const AuthContext = createContext(null);
 
@@ -47,6 +48,23 @@ export function AuthProvider({ children }) {
       sub.subscription.unsubscribe();
     };
   }, [loadIdentity]);
+
+  // Mantém o registro de push em dia.
+  //
+  // O endpoint que o navegador entrega pode mudar sozinho — atualização do
+  // browser, limpeza interna, troca de conta. Quando muda, a linha em
+  // `push_tokens` vira um endereço morto e a pessoa para de receber aviso sem
+  // nenhum sinal de que parou. Regravar a cada carregamento custa uma consulta
+  // e cobre a falha mais silenciosa que este app tem.
+  //
+  // Não pede permissão: só age onde ela já foi concedida antes.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    sincronizarInscricao(userId, 'cliente');
+    if (staff) sincronizarInscricao(userId, 'equipe');
+  }, [session?.user?.id, staff]);
 
   const value = useMemo(
     () => ({
