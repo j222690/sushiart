@@ -1,6 +1,9 @@
 import { chromium } from 'playwright';
 
-const BASE = 'http://localhost:5173';
+// Porta cravada no codigo ja produziu falso "tudo certo": outro projeto subiu
+// na 5173, o Vite jogou este app na 5174, e o smoke aprovou a aplicacao errada.
+// Confira a porta que o `npm run dev` imprimiu e passe em SMOKE_BASE.
+const BASE = process.env.SMOKE_BASE || 'http://localhost:5173';
 const OUT = process.argv[2] || '.';
 
 const PAGES = [
@@ -15,6 +18,9 @@ const PAGES = [
   ['/admin', 'admin-redirect'],
   ['/admin/entrar', 'admin-login'],
 ];
+
+// Trava de identidade: sem isso o script aprova qualquer coisa que atenda na porta.
+const ESPERADO = /Sushi Art/i;
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
@@ -38,6 +44,11 @@ for (const [path, nome] of PAGES) {
     await page.goto(BASE + path, { waitUntil: 'networkidle', timeout: 25000 });
     // A splash tem 900ms mínimos; espera ela sair antes de julgar a tela.
     await page.waitForTimeout(2200);
+
+    const titulo = await page.title();
+    if (!ESPERADO.test(titulo)) {
+      throw new Error(`${BASE} nao e o Sushi Art (title: "${titulo}"). Confira SMOKE_BASE.`);
+    }
 
     const texto = (await page.locator('body').innerText()).trim();
     const url = new URL(page.url()).pathname;
