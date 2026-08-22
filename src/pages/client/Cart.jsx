@@ -66,7 +66,7 @@ export default function Cart() {
             onClick={() => setFulfillment(key)}
             className={clsx(
               'flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold transition-colors',
-              fulfillment === key ? 'bg-vinho-500 text-cream' : 'text-cream-muted hover:text-cream'
+              fulfillment === key ? 'bg-vinho-500 text-white' : 'text-cream-muted hover:text-white'
             )}
           >
             <Icon size={15} />

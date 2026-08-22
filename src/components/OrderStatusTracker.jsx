@@ -63,7 +63,7 @@ export default function OrderStatusTracker({ order, history = [] }) {
               className={clsx(
                 'relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition-colors',
                 done
-                  ? 'border-vinho-500 bg-vinho-500 text-cream'
+                  ? 'border-vinho-500 bg-vinho-500 text-white'
                   : 'border-ink-50 bg-ink-400 text-cream-faint',
                 active && 'animate-pulse-glow'
               )}

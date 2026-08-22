@@ -7,37 +7,16 @@ import clsx from 'clsx';
  */
 export function LogoMark({ size = 40, className }) {
   return (
-    <svg
-      viewBox="0 0 512 512"
+    <img
+      src="/logo-sushiart.jpg"
       width={size}
       height={size}
-      role="img"
-      aria-label="Sushi Art"
-      className={clsx('shrink-0', className)}
-    >
-      <defs>
-        <linearGradient id="sa-vinho" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#8B2635" />
-          <stop offset="100%" stopColor="#611A1B" />
-        </linearGradient>
-      </defs>
-      <circle cx="256" cy="256" r="256" fill="url(#sa-vinho)" />
-      <circle cx="256" cy="256" r="238" fill="none" stroke="#F5F1EA" strokeOpacity="0.35" strokeWidth="3" />
-      <g stroke="#F5F1EA" strokeLinecap="round" opacity="0.9">
-        <line x1="150" y1="392" x2="366" y2="150" strokeWidth="10" />
-        <line x1="188" y1="404" x2="392" y2="176" strokeWidth="10" />
-      </g>
-      <text
-        x="256"
-        y="286"
-        textAnchor="middle"
-        fill="#F5F1EA"
-        fontFamily="Great Vibes, cursive"
-        fontSize="150"
-      >
-        Sushi Art
-      </text>
-    </svg>
+      alt="Sushi Art"
+      loading="eager"
+      decoding="async"
+      style={{ width: size, height: size }}
+      className={clsx('shrink-0 rounded-full object-cover', className)}
+    />
   );
 }
 

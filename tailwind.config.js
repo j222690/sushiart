@@ -11,54 +11,65 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Fundo — preto / quase preto
+        // ---------------------------------------------------------------
+        // Tema CLARO. Os nomes vieram do tema escuro original e ficaram:
+        // `ink` continua sendo "superfície" e `cream` continua sendo "texto"
+        // — só que agora ink é claro e cream é escuro. Renomear os dois
+        // custaria centenas de linhas alteradas em toda a interface sem
+        // mudar um pixel do resultado.
+        // ---------------------------------------------------------------
+
+        // Superfícies — branco e cinzas quentes (o "quente" evita o branco
+        // clínico e mantém o clima de empório, não de farmácia)
         ink: {
-          DEFAULT: '#0D0D0D', // fundo base do app
-          50: '#2A2A2A',
-          100: '#242424',
-          200: '#1E1E1E',
-          300: '#1A1A1A',
-          400: '#161616',
-          500: '#121212', // superfícies elevadas (cards, sheets)
-          600: '#0F0F0F',
-          700: '#0D0D0D',
-          800: '#0A0A0A',
-          900: '#050505',
+          DEFAULT: '#F6F3EF', // fundo da página
+          50: '#E4DDD3',      // bordas fortes, switch desligado
+          100: '#FFFFFF',
+          200: '#FBF9F6',
+          300: '#F1ECE5',     // campos, blocos levemente elevados
+          400: '#F8F5F1',
+          500: '#FFFFFF',     // cards
+          600: '#FFFFFF',     // cabeçalhos fixos
+          700: '#F6F3EF',
+          800: '#EFEAE3',
+          900: '#E7E0D7',
         },
-        // Destaque — vermelho vinho / bordô do logo
+        // Marca — o vinho do logo, agora sobre claro
         vinho: {
           DEFAULT: '#8B2635',
-          50: '#F5E4E6',
-          100: '#E8C0C5',
-          200: '#D3939B',
-          300: '#BC6672',
+          // 100–300 eram tons PÁLIDOS, feitos para brilhar no fundo preto.
+          // Como texto sobre branco eles sumiriam, então viraram tons
+          // escuros: o papel deles no layout é o mesmo (destaque legível).
+          50: '#FBF0F1',
+          100: '#A34450',
+          200: '#8B2635',
+          300: '#7A2020',
           400: '#A34450',
-          500: '#8B2635', // primária (botões, nav ativa, badges)
-          600: '#7A2020', // hover / estados pressionados
+          500: '#8B2635', // primária — botões, nav ativa, badges
+          600: '#7A2020', // hover
           700: '#611A1B',
-          800: '#471314',
-          900: '#2E0C0D',
+          800: '#F5DFE2',
+          900: '#EBC9CD', // usado com /30 como realce suave (não lido)
         },
         // Texto
         cream: {
-          DEFAULT: '#F5F1EA', // off-white principal
-          muted: '#A8A29A', // texto secundário
-          faint: '#6B6660', // texto terciário / placeholders
+          DEFAULT: '#211D1B', // principal
+          muted: '#6A625B',   // secundário
+          faint: '#9C948B',   // terciário, placeholders
         },
-        // Realces quentes (iluminação ambiente das fotos)
-        ember: '#C9803F', // dourado/âmbar para pontos de fidelidade, estrelas
-        // Semânticos
-        success: '#3FA66A',
-        warning: '#D9A441',
-        danger: '#D14343',
-        // Aliases semânticos de superfície
+        // Realce quente — escurecido para ter contraste sobre branco
+        ember: '#B06A2C',
+        // Semânticos — todos escurecidos pelo mesmo motivo
+        success: '#2E8B57',
+        warning: '#B0791A',
+        danger: '#C62828',
         surface: {
-          DEFAULT: '#121212',
-          raised: '#1A1A1A',
-          overlay: '#1E1E1E',
-          sunken: '#0A0A0A',
+          DEFAULT: '#FFFFFF',
+          raised: '#FBF9F6',
+          overlay: '#FFFFFF',
+          sunken: '#F1ECE5',
         },
-        line: 'rgba(245, 241, 234, 0.08)', // divisores sutis
+        line: 'rgba(33, 29, 27, 0.10)',
       },
       fontFamily: {
         // Título/marca — toque caligráfico elegante
@@ -72,14 +83,14 @@ export default {
         sheet: '1.5rem',
       },
       boxShadow: {
-        card: '0 2px 12px rgba(0, 0, 0, 0.45)',
-        raised: '0 8px 32px rgba(0, 0, 0, 0.6)',
-        glow: '0 0 24px rgba(139, 38, 53, 0.35)', // brilho vinho (roleta, CTA)
+        card: '0 1px 2px rgba(33, 29, 27, 0.05), 0 1px 3px rgba(33, 29, 27, 0.08)',
+        raised: '0 8px 28px rgba(33, 29, 27, 0.12)',
+        glow: '0 0 24px rgba(139, 38, 53, 0.18)', // brilho vinho (roleta, CTA)
       },
       backgroundImage: {
         'vinho-gradient': 'linear-gradient(135deg, #8B2635 0%, #611A1B 100%)',
-        'ink-fade': 'linear-gradient(180deg, rgba(13,13,13,0) 0%, rgba(13,13,13,0.95) 75%)',
-        'ember-glow': 'radial-gradient(circle at 50% 0%, rgba(201,128,63,0.18) 0%, transparent 60%)',
+        'ink-fade': 'linear-gradient(180deg, rgba(246,243,239,0) 0%, rgba(246,243,239,0.97) 75%)',
+        'ember-glow': 'radial-gradient(circle at 50% 0%, rgba(176,106,44,0.10) 0%, transparent 60%)',
       },
       keyframes: {
         'slide-up': {
@@ -91,8 +102,8 @@ export default {
           '100%': { opacity: '1' },
         },
         pulseGlow: {
-          '0%, 100%': { boxShadow: '0 0 16px rgba(139, 38, 53, 0.3)' },
-          '50%': { boxShadow: '0 0 32px rgba(139, 38, 53, 0.6)' },
+          '0%, 100%': { boxShadow: '0 0 14px rgba(139, 38, 53, 0.18)' },
+          '50%': { boxShadow: '0 0 28px rgba(139, 38, 53, 0.34)' },
         },
         shimmer: {
           '100%': { transform: 'translateX(100%)' },

@@ -40,7 +40,7 @@ export default function AdminLayout() {
             clsx(
               'flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors',
               isActive
-                ? 'bg-vinho-500 text-cream'
+                ? 'bg-vinho-500 text-white'
                 : 'text-cream-muted hover:bg-ink-300 hover:text-cream'
             )
           }

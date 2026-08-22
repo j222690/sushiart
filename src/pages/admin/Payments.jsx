@@ -122,7 +122,7 @@ export default function Payments() {
                 <span
                   className={clsx(
                     'grid h-11 w-11 shrink-0 place-items-center rounded-xl',
-                    row.is_active ? 'bg-vinho-gradient text-cream' : 'bg-ink-300 text-cream-faint'
+                    row.is_active ? 'bg-vinho-gradient text-white' : 'bg-ink-300 text-cream-faint'
                   )}
                 >
                   <Icon size={20} />

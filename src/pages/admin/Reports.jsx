@@ -137,7 +137,7 @@ export default function Reports() {
                 onClick={() => setRange(item.key)}
                 className={clsx(
                   'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
-                  range === item.key ? 'bg-vinho-500 text-cream' : 'text-cream-muted hover:text-cream'
+                  range === item.key ? 'bg-vinho-500 text-white' : 'text-cream-muted hover:text-white'
                 )}
               >
                 {item.label}

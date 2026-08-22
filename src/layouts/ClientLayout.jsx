@@ -1,7 +1,8 @@
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import clsx from 'clsx';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Search, Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import BottomNav from '../components/BottomNav';
+import BottomNav, { TABS } from '../components/BottomNav';
 import { Logo } from '../components/Logo';
 import { useCart } from '../store/cart';
 import { useStore } from '../context/StoreContext';
@@ -54,12 +55,34 @@ export default function ClientLayout() {
   const opening = nextOpening(hours);
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-lg flex-col bg-ink">
+    <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col bg-ink md:max-w-3xl lg:max-w-5xl xl:max-w-6xl">
       <header className="sticky top-0 z-30 border-b border-line bg-ink-600/95 backdrop-blur safe-top">
         <div className="flex items-center gap-3 px-4 py-3">
           <button type="button" onClick={() => navigate('/')} className="min-w-0">
             <Logo size="sm" />
           </button>
+
+          {/* Navegação no cabeçalho — só a partir de lg, onde a barra
+              inferior deixa de existir. */}
+          <nav className="ml-6 hidden items-center gap-1 lg:flex" aria-label="Navegação principal">
+            {TABS.map(({ to, label, end }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  clsx(
+                    'rounded-xl px-3.5 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-vinho-500 text-white'
+                      : 'text-cream-muted hover:bg-ink-300 hover:text-cream'
+                  )
+                }
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
 
           <div className="ml-auto flex items-center gap-1">
             <button
@@ -93,7 +116,7 @@ export default function ClientLayout() {
         )}
       </header>
 
-      <main className="flex-1 pb-32">
+      <main className="flex-1 pb-32 lg:pb-12">
         <Outlet />
       </main>
 

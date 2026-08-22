@@ -86,8 +86,8 @@ export default function Roulette({ prizes, canSpin, reason, onSpin, spinning: ex
         {/* Ponteiro */}
         <div className="absolute left-1/2 top-[-6px] z-20 -translate-x-1/2">
           <svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true">
-            <path d="M13 30 L1 4 A 13 13 0 0 1 25 4 Z" fill="#C9803F" />
-            <circle cx="13" cy="9" r="4" fill="#0D0D0D" />
+            <path d="M13 30 L1 4 A 13 13 0 0 1 25 4 Z" fill="#B06A2C" />
+            <circle cx="13" cy="9" r="4" fill="#FFFFFF" />
           </svg>
         </div>
 
@@ -103,11 +103,11 @@ export default function Roulette({ prizes, canSpin, reason, onSpin, spinning: ex
             transition: busy ? `transform ${SPIN_MS}ms cubic-bezier(0.12, 0.72, 0.12, 1)` : 'none',
           }}
         >
-          <circle cx={cx} cy={cy} r={radius + 4} fill="#0A0A0A" />
+          <circle cx={cx} cy={cy} r={radius + 4} fill="#E4DDD3" />
 
           {slices.map(({ prize, path, labelX, labelY, labelAngle }) => (
             <g key={prize.id}>
-              <path d={path} fill={prize.color || '#8B2635'} stroke="#0D0D0D" strokeWidth="2" />
+              <path d={path} fill={prize.color || '#8B2635'} stroke="#FFFFFF" strokeWidth="2" />
               <text
                 x={labelX}
                 y={labelY}
@@ -123,7 +123,7 @@ export default function Roulette({ prizes, canSpin, reason, onSpin, spinning: ex
             </g>
           ))}
 
-          <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#C9803F" strokeWidth="3" opacity="0.5" />
+          <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#B06A2C" strokeWidth="3" opacity="0.5" />
         </svg>
 
         {/* Miolo com a marca */}

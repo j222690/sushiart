@@ -83,7 +83,7 @@ export default function Search() {
       {!loading && results === null && (
         <section className="mt-6">
           <h2 className="mb-3 font-brand text-base text-cream">Sugestões da casa</h2>
-          <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {bestsellers.slice(0, 6).map((product) => (
               <ProductCard
                 key={product.id}
@@ -110,7 +110,7 @@ export default function Search() {
           <p className="mb-3 text-xs text-cream-muted">
             {results.length} {results.length === 1 ? 'resultado' : 'resultados'}
           </p>
-          <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {results.map((product) => (
               <ProductCard
                 key={product.id}

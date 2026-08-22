@@ -114,7 +114,7 @@ export default function ProductCard({
               Esgotado
             </span>
           ) : (
-            <span className="absolute -bottom-1.5 -right-1.5 grid h-7 w-7 place-items-center rounded-full bg-vinho-500 text-cream shadow-card">
+            <span className="absolute -bottom-1.5 -right-1.5 grid h-7 w-7 place-items-center rounded-full bg-vinho-500 text-white shadow-card">
               <Plus size={16} />
             </span>
           )}

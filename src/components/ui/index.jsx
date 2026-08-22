@@ -6,7 +6,8 @@ import { Loader2, X } from 'lucide-react';
 // Button
 // ---------------------------------------------------------------------------
 const VARIANTS = {
-  primary: 'bg-vinho-500 text-cream hover:bg-vinho-600 active:bg-vinho-700 disabled:bg-vinho-800',
+  primary:
+    'bg-vinho-500 text-white hover:bg-vinho-600 active:bg-vinho-700 disabled:bg-vinho-500/35 disabled:text-white/70',
   secondary: 'bg-ink-200 text-cream hover:bg-ink-100 border border-line',
   ghost: 'bg-transparent text-cream-muted hover:text-cream hover:bg-ink-200',
   outline: 'border border-vinho-500 text-vinho-200 hover:bg-vinho-900/40',
@@ -48,7 +49,7 @@ export const Button = forwardRef(function Button(
 // Badge
 // ---------------------------------------------------------------------------
 const BADGE_TONES = {
-  vinho: 'bg-vinho-500 text-cream',
+  vinho: 'bg-vinho-500 text-white',
   ember: 'bg-ember/15 text-ember border border-ember/30',
   success: 'bg-success/15 text-success border border-success/30',
   warning: 'bg-warning/15 text-warning border border-warning/30',

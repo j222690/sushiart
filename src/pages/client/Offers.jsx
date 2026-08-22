@@ -138,7 +138,7 @@ export default function Offers() {
           <h2 className="mb-3 flex items-center gap-2 font-brand text-lg text-cream">
             <Gift size={17} className="text-ember" /> Seus cupons
           </h2>
-          <div className="space-y-2.5">
+          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
             {myCoupons.map((coupon) => (
               <CouponCard key={coupon.id} coupon={coupon} />
             ))}
@@ -184,7 +184,7 @@ export default function Offers() {
             description="Gire a roleta acima — ela solta cupom todo dia."
           />
         ) : (
-          <div className="space-y-2.5">
+          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
             {publicCoupons.map((coupon) => (
               <CouponCard key={coupon.id} coupon={coupon} />
             ))}

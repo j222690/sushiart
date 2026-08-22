@@ -100,7 +100,7 @@ export default function Menu() {
             className={clsx(
               'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors',
               activeSlug === tab.slug
-                ? 'bg-vinho-500 text-cream'
+                ? 'bg-vinho-500 text-white'
                 : 'bg-ink-300 text-cream-muted hover:text-cream'
             )}
           >
@@ -119,7 +119,7 @@ export default function Menu() {
           className="scroll-mt-28 px-4 pt-6"
         >
           <h2 className="mb-3 font-brand text-xl text-cream">{category.name}</h2>
-          <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {category.products.map((product) => (
               <ProductCard
                 key={product.id}

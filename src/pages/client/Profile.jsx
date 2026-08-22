@@ -97,7 +97,7 @@ export default function Profile() {
   return (
     <div className="px-4 pb-8 pt-4">
       <Card className="mb-4 flex items-center gap-3.5 p-4">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-vinho-gradient text-lg font-bold text-cream">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-vinho-gradient text-lg font-bold text-white">
           {(customer?.name || user.email || '?').charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0 flex-1">

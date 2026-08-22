@@ -306,25 +306,49 @@ Um princípio percorre o projeto inteiro: **o navegador nunca decide preço**.
 
 ## 5. Identidade visual
 
-Tema escuro, seguindo o Instagram [@sushiartchapeco](https://instagram.com/sushiartchapeco).
+Tema **claro**, no formato dos apps de delivery: fundo bege quente, cards
+brancos, e o vinho da marca reservado para o que é clicável.
 
 | Token | Valor | Uso |
 |---|---|---|
-| `ink` | `#0D0D0D` → `#121212` | Fundo e superfícies |
+| `ink` | `#F6F3EF` (fundo) → `#FFFFFF` (cards) | Superfícies |
+| `cream` | `#211D1B` / `#6A625B` / `#9C948B` | Texto principal, secundário, terciário |
 | `vinho` | `#8B2635` / `#7A2020` | Botões, badges, nav ativa, roleta |
-| `cream` | `#F5F1EA` | Texto sobre o escuro |
-| `ember` | `#C9803F` | Pontos de fidelidade, brilho quente |
+| `ember` | `#B06A2C` | Pontos de fidelidade, realce quente |
+
+> ⚠️ **Os nomes mentem, e é de propósito.** O projeto nasceu escuro: `ink` era
+> preto e `cream` era o off-white do texto. Ao inverter, os valores mudaram mas
+> os nomes ficaram — `ink` continua significando "superfície" e `cream`
+> continua significando "texto", só que agora ink é claro e cream é escuro.
+> Renomear os dois custaria centenas de linhas alteradas em toda a interface
+> sem mudar um pixel do resultado.
+>
+> Consequência prática: **texto sobre fundo vinho usa `text-white`, nunca
+> `text-cream`** — cream é escuro agora, e sobre o vinho ficaria ilegível.
+> Mesma regra para `bg-vinho-800/900`, que viraram rosas claros e pedem texto
+> escuro.
 
 Fontes: **Great Vibes** (assinatura da marca), **Playfair Display** (títulos),
 **Inter** (interface, preços e botões).
 
-Tudo vive em `tailwind.config.js` — **nenhum componente usa hex hardcoded**.
-Para ajustar a marca, mexa só nesse arquivo.
+Quase tudo vive em `tailwind.config.js`. As exceções são SVGs, onde classes do
+Tailwind não alcançam: `Logo.jsx`, `Roulette.jsx`, `MapPicker.jsx` e os eixos
+do gráfico em `Dashboard.jsx` têm hex direto. Ao mexer na paleta, confira esses
+quatro.
 
-Placeholders de foto seguem o clima da marca: fundo escuro com brilho quente ao
-centro (`ProductImage.jsx`), em vez do quadrado cinza claro de app de fast-food.
+O logo em `public/logo-sushiart.jpg` é o oficial do restaurante, mas está em
+**150×150** — suficiente para o emblema do cabeçalho, apertado para qualquer
+uso maior. O favicon e os ícones do PWA ainda apontam para o `logo.svg`
+desenhado, porque o manifest pede 192 e 512 px.
 
----
+### Telas
+
+O app do cliente responde de celular a monitor:
+
+- **até `lg`** — coluna única, navegação na barra inferior (idioma de celular)
+- **`md`** — listas de produto viram duas colunas
+- **`lg` em diante** — a barra inferior some, a navegação sobe para o cabeçalho
+  e o container abre até `max-w-6xl`; listas em três colunas no `xl`
 
 ## 6. Mapa do código
 

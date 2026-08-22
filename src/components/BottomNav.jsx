@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { Home, UtensilsCrossed, Tag, ReceiptText, User } from 'lucide-react';
 import clsx from 'clsx';
 
-const TABS = [
+export const TABS = [
   { to: '/', label: 'Início', icon: Home, end: true },
   { to: '/cardapio', label: 'Cardápio', icon: UtensilsCrossed },
   { to: '/ofertas', label: 'Ofertas', icon: Tag },
@@ -15,7 +15,9 @@ export default function BottomNav({ badge }) {
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink-600/95 backdrop-blur safe-bottom"
+      // No desktop a navegação sobe para o cabeçalho: barra inferior é idioma de
+      // celular, e num monitor de 27" ela fica flutuando sozinha lá embaixo.
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink-600/95 backdrop-blur safe-bottom lg:hidden"
     >
       <ul className="mx-auto flex max-w-lg items-stretch">
         {TABS.map(({ to, label, icon: Icon, end }) => (
@@ -38,7 +40,7 @@ export default function BottomNav({ badge }) {
                   <span className="relative">
                     <Icon size={21} strokeWidth={isActive ? 2.4 : 1.9} />
                     {to === '/pedidos' && badge > 0 && (
-                      <span className="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-vinho-500 px-1 text-[9px] font-bold text-cream">
+                      <span className="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-vinho-500 px-1 text-[9px] font-bold text-white">
                         {badge}
                       </span>
                     )}

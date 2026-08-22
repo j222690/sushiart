@@ -72,7 +72,7 @@ export default function CouponCard({ coupon, onApply, applied, disabled }) {
               'shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-colors',
               applied
                 ? 'bg-success/20 text-success'
-                : 'bg-vinho-500 text-cream hover:bg-vinho-600 disabled:opacity-50'
+                : 'bg-vinho-500 text-white hover:bg-vinho-600 disabled:opacity-50'
             )}
           >
             {applied ? (
