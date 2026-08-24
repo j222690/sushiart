@@ -15,8 +15,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: '/logo.svg',
-      badge: '/logo.svg',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
       tag: payload.tag || 'sushiart',
       data: payload.data || {},
       // Aviso de pedido novo fica na tela até alguém tocar. Numa cozinha

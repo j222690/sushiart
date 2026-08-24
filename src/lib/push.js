@@ -194,5 +194,5 @@ export async function sincronizarInscricao(userId, audience = 'cliente') {
 /** Notificação local — útil para avisar de mudança de status com o app aberto. */
 export function notifyLocal(title, body, data = {}) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  new Notification(title, { body, icon: '/logo.svg', badge: '/logo.svg', data });
+  new Notification(title, { body, icon: '/icon-192.png', badge: '/icon-192.png', data });
 }

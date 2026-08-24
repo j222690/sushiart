@@ -1,14 +1,16 @@
 import clsx from 'clsx';
 
 /**
- * Marca do Sushi Art: disco vinho, assinatura caligráfica e os hashi cruzados.
- * Vem do mesmo desenho de /public/logo.svg, aqui como componente para poder
- * herdar tamanho e responder a hover/animação.
+ * Marca do Sushi Art, recortada em círculo.
+ *
+ * Usa o PNG de 192 px, não o JPEG original de 150: o emblema aparece em até
+ * 64 px, e numa tela 3x isso pede 192. O arquivo é o mesmo que serve de ícone
+ * do PWA, então o navegador baixa uma vez só.
  */
 export function LogoMark({ size = 40, className }) {
   return (
     <img
-      src="/logo-sushiart.jpg"
+      src="/icon-192.png"
       width={size}
       height={size}
       alt="Sushi Art"
