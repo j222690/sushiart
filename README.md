@@ -48,6 +48,41 @@ O bucket `menu` é criado pela migration `0006_storage.sql`: público para leitu
 (a foto do prato abre sem login) e gravável só por quem está na tabela `staff`.
 Limite de 5 MB por arquivo, apenas JPG/PNG/WEBP/AVIF.
 
+### Trazer as fotos do Anota AI
+
+Para não subir 66 fotos na mão, `scripts/` importa as que já estão na loja do
+Anota AI. São dois passos porque a página fica atrás de Cloudflare, que bloqueia
+navegador automatizado (testado: 403, e o Playwright leva tela de bloqueio). O
+seu navegador passa porque é uma pessoa acessando — então a coleta fica com você
+e o resto é automático.
+
+```bash
+# 1. Abra a loja no navegador, F12 → Console, cole scripts/coletar-fotos.js.
+#    Ele rola a página, mostra o que achou e baixa fotos-anota.json.
+
+# 2. Confira o casamento sem tocar em nada:
+$env:SUPABASE_SERVICE_ROLE_KEY = "..."     # Supabase → Settings → API
+node scripts/importar-fotos.mjs fotos-anota.json
+
+# 3. Se a lista estiver certa, aplique:
+node scripts/importar-fotos.mjs fotos-anota.json --aplicar
+```
+
+O passo 2 é obrigatório de propósito: sem `--aplicar` o script só imprime o que
+casou, o que ficou sem foto e quais fotos sobraram. Produto que já tem
+`image_url` é pulado, a não ser com `--sobrescrever`.
+
+O casamento de nomes vive em `scripts/casar-nomes.mjs`, separado porque é a
+parte que pode estragar dado — ele decide em qual produto cada foto vai parar.
+Tem teste: `npm run test:fotos`.
+
+O detalhe que o teste pegou: **número é sinal forte, não mais uma palavra.** O
+cardápio tem `Especial 40 Peças`, `Especial 42 Peças` e
+`Enamorado 45 Peças + 1 Ceviche + 1 Sunomono` ao lado do de 60 — nomes que
+compartilham quase todos os tokens e diferem só na contagem. Por similaridade
+pura eles casavam entre si a 75% e trocavam de foto. Agora, se os dois lados
+têm número e os números diferem, o par é descartado direto.
+
 ### Liberar acesso ao painel
 
 O `/admin` só abre para quem está na tabela `staff`. Crie a conta normalmente
