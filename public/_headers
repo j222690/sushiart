@@ -1,0 +1,13 @@
+# Netlify e Cloudflare Pages. Na Vercel o equivalente esta no vercel.json.
+
+# Nome com hash: pode cachear para sempre.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Service worker cacheado trava o app numa versao velha: o navegador continua
+# servindo o sw.js antigo e a atualizacao nunca chega.
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache

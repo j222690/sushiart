@@ -336,10 +336,30 @@ Tailwind não alcançam: `Logo.jsx`, `Roulette.jsx`, `MapPicker.jsx` e os eixos
 do gráfico em `Dashboard.jsx` têm hex direto. Ao mexer na paleta, confira esses
 quatro.
 
-O logo em `public/logo-sushiart.jpg` é o oficial do restaurante, mas está em
-**150×150** — suficiente para o emblema do cabeçalho, apertado para qualquer
-uso maior. O favicon e os ícones do PWA ainda apontam para o `logo.svg`
-desenhado, porque o manifest pede 192 e 512 px.
+O logo em `public/logo-sushiart.jpg` é o oficial do restaurante, e é a fonte de
+todos os ícones. Dele saem três PNGs, gerados por reamostragem bicúbica sobre o
+vermelho `#912825` do próprio logo (fundo chapado, então a emenda não aparece):
+
+| Arquivo | Uso | Escala |
+| --- | --- | --- |
+| `icon-192.png` | favicon, apple-touch-icon, emblema do cabeçalho | 1,28× |
+| `icon-512.png` | ícone grande do PWA | 3,41× |
+| `icon-maskable-512.png` | ícone `maskable` do Android | 2,27× |
+
+> **O original é pequeno.** 150×150 num JPEG de 2,7 kB — provável foto de perfil
+> de rede social. O de 192 fica limpo, mas o de 512 é uma ampliação de 3,41× e
+> mostra isso: contorno mole nas letras e no traço fino do peixe. Se aparecer o
+> arquivo original do designer (PNG, PDF, AI ou SVG), é só regerar os três a
+> partir dele — nenhum código muda.
+
+O `maskable` desenha a arte a 340 px dentro dos 512 porque o Android recorta o
+ícone em círculo. Em tamanho cheio o arco do "SUSHI ART" ficaria cortado nas
+pontas; a sobra de vermelho ao redor resolve, e como o fundo é o mesmo, ela lê
+como margem, não como moldura.
+
+O `logo.svg` continua no repositório, mas fora do HTML e do manifest: era outro
+desenho (disco vinho, assinatura em cursiva), e o texto dele depende de webfont
+— que não carrega em contexto de favicon, onde ele cairia numa fonte qualquer.
 
 ### Telas
 
@@ -391,10 +411,22 @@ supabase/functions/
 
 ## 7. Deploy
 
-`npm run build` gera `dist/`. Publique em Vercel, Netlify ou Cloudflare Pages.
+`npm run build` gera `dist/`. Publique em Vercel, Netlify ou Cloudflare Pages —
+o *rewrite* de SPA já vem configurado para as três, então não há passo manual:
 
-O app é uma SPA: configure o *rewrite* de todas as rotas para `/index.html`,
-senão `/admin` e `/pedidos/:id` dão 404 no refresh.
+| Arquivo | Quem lê |
+| --- | --- |
+| `vercel.json` | Vercel |
+| `public/_redirects` | Netlify e Cloudflare Pages |
+| `public/_headers` | Netlify e Cloudflare Pages |
+
+Sem esse rewrite, `/admin` e `/pedidos/:id` dão 404 no refresh: o servidor
+procura um arquivo naquele caminho, que só existe dentro do React Router.
+
+Os headers cacheiam `/assets/*` para sempre (o nome tem hash, então mudança de
+conteúdo muda o nome) e proíbem cache em `sw.js`. Service worker cacheado é
+armadilha conhecida de PWA: o navegador continua servindo o worker velho e a
+atualização nunca chega no aparelho de quem já instalou.
 
 Depois do deploy, em Supabase → Authentication → URL Configuration, aponte o
 **Site URL** para o domínio final (é o que faz o link de recuperação de senha
