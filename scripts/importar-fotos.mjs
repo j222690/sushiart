@@ -13,7 +13,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
-import { casar } from './casar-nomes.mjs';
+import { casar, semelhanca } from './casar-nomes.mjs';
 
 const BUCKET = 'menu';
 const PASTA = 'produtos';
@@ -65,8 +65,22 @@ for (const p of comFoto) {
   console.log(`  ${(score * 100).toFixed(0).padStart(3)}%  ${p.name}  <-  ${item.nome}${marca}`);
 }
 
+// Mostra o melhor quase-par de cada um. Diferenca de grafia entre os dois
+// sistemas ("Suzuka" no banco, "Suzuca" no site) para em 50% e nao entra — de
+// proposito, porque foto errada num produto e pior que foto faltando: o cliente
+// ve. Aqui voce enxerga o caso e resolve na mao.
 console.log(`\n=== SEM FOTO (${semFoto.length}) ===`);
-for (const p of semFoto) console.log(`  ${p.name}`);
+for (const p of semFoto) {
+  let melhor = { nome: null, score: 0 };
+  for (const it of itens) {
+    const score = semelhanca(p.name, it.nome);
+    if (score > melhor.score) melhor = { nome: it.nome, score };
+  }
+  const dica = melhor.nome
+    ? `   (mais parecida: ${(melhor.score * 100).toFixed(0)}% "${melhor.nome}")`
+    : '   (nada parecido na loja)';
+  console.log(`  ${p.name}${dica}`);
+}
 
 console.log(`\n=== FOTOS QUE NAO CASARAM (${fotosSobrando.length}) ===`);
 for (const it of fotosSobrando) console.log(`  ${it.nome}`);
@@ -74,6 +88,36 @@ for (const it of fotosSobrando) console.log(`  ${it.nome}`);
 if (!aplicar) {
   console.log('\nNada foi alterado. Confira a lista acima e rode de novo com --aplicar.');
   process.exit(0);
+}
+
+// --- de onde saem os bytes ---------------------------------------------------
+
+/**
+ * O CDN do Anota AI devolve 403 para requisicao de fora do navegador — testado
+ * com GET, User-Agent de Chrome e Referer. Por isso o coletor ja embute cada
+ * foto no JSON como data URL, e o caminho normal aqui e so decodificar.
+ *
+ * O fetch fica como reserva para JSON de outra origem, que nao tenha `dados`.
+ */
+async function obterBytes(item) {
+  if (item.dados) {
+    const m = /^data:([^;,]+);base64,(.*)$/s.exec(item.dados);
+    if (!m) throw new Error('data URL malformada no JSON');
+    return { tipo: m[1].trim(), bytes: Buffer.from(m[2], 'base64') };
+  }
+
+  const resp = await fetch(item.foto);
+  if (!resp.ok) {
+    throw new Error(
+      resp.status === 403
+        ? 'HTTP 403 — o CDN bloqueia download fora do navegador. Recolete com o coletor novo, que embute os bytes.'
+        : `download HTTP ${resp.status}`
+    );
+  }
+  return {
+    tipo: (resp.headers.get('content-type') || '').split(';')[0].trim(),
+    bytes: new Uint8Array(await resp.arrayBuffer()),
+  };
 }
 
 // --- baixa, sobe, grava ------------------------------------------------------
@@ -92,13 +136,9 @@ for (const p of comFoto) {
   }
 
   try {
-    const resp = await fetch(item.foto);
-    if (!resp.ok) throw new Error(`download HTTP ${resp.status}`);
+    const { tipo, bytes } = await obterBytes(item);
 
-    const tipo = (resp.headers.get('content-type') || '').split(';')[0].trim();
     if (!TIPOS_OK.includes(tipo)) throw new Error(`tipo nao aceito: ${tipo || 'desconhecido'}`);
-
-    const bytes = new Uint8Array(await resp.arrayBuffer());
     if (bytes.byteLength > TAMANHO_MAX) {
       throw new Error(`${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB, acima do limite de 5 MB`);
     }

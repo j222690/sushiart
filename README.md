@@ -50,11 +50,17 @@ Limite de 5 MB por arquivo, apenas JPG/PNG/WEBP/AVIF.
 
 ### Trazer as fotos do Anota AI
 
-Para não subir 66 fotos na mão, `scripts/` importa as que já estão na loja do
-Anota AI. São dois passos porque a página fica atrás de Cloudflare, que bloqueia
-navegador automatizado (testado: 403, e o Playwright leva tela de bloqueio). O
-seu navegador passa porque é uma pessoa acessando — então a coleta fica com você
-e o resto é automático.
+Para não subir as fotos uma a uma, `scripts/` importa as que já estão na loja do
+Anota AI. São dois passos, e o navegador faz **a coleta e o download**:
+
+- a página fica atrás de Cloudflare, que bloqueia navegador automatizado
+  (testado: 403, e o Playwright leva a tela de bloqueio);
+- o CDN `client-assets.anota.ai` também devolve **403 para qualquer requisição
+  fora do navegador** — testado com GET, User-Agent de Chrome e Referer.
+
+Por isso o coletor embute cada foto no JSON como data URL, e o importador só
+decodifica e sobe. O seu navegador passa nos dois porque é uma pessoa acessando
+a própria loja.
 
 ```bash
 # 1. Abra a loja no navegador, F12 → Console, cole scripts/coletar-fotos.js.
@@ -82,6 +88,16 @@ cardápio tem `Especial 40 Peças`, `Especial 42 Peças` e
 compartilham quase todos os tokens e diferem só na contagem. Por similaridade
 pura eles casavam entre si a 75% e trocavam de foto. Agora, se os dois lados
 têm número e os números diferem, o par é descartado direto.
+
+O limiar de 55% é deliberadamente conservador: **foto errada num produto é pior
+que foto faltando**, porque o cliente vê. Diferença de grafia entre os dois
+sistemas (`Suzuka Djow` no banco, `Suzuca Djow` na loja) para em 50% e não
+entra. Em vez de baixar o limiar, o importador lista cada produto sem foto com o
+seu melhor quase-par, para você resolver na mão os poucos casos.
+
+Na coleta de agosto/2026 o resultado foi **51 de 53 produtos**, quase todos a
+100%. Ficaram de fora o `Suzuka`/`Suzuca` acima e `Big Roll Recheado`, que não
+tem foto na loja.
 
 ### Liberar acesso ao painel
 
