@@ -10,10 +10,29 @@
  *
  * Sem --aplicar nada e tocado nem baixado: so imprime o casamento para conferir.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { chromium } from 'playwright';
 import { casar, semelhanca } from './casar-nomes.mjs';
+
+// O `.env` do projeto ja tem a URL do Supabase, mas quem le aquilo e o Vite, no
+// build do app — o Node nao le sozinho. Sem isto voce teria que exportar a URL
+// na mao toda vez, mesmo ela estando ali do lado.
+// A chave de service role NAO fica no .env de proposito: ela nunca deve chegar
+// ao navegador, e tudo que comeca com VITE_ vai junto no bundle.
+function carregarEnv(caminho = '.env') {
+  if (!existsSync(caminho)) return;
+  // Split em /\r?\n/, nao em '\n': num arquivo com quebra de linha do Windows
+  // sobraria um \r no fim da linha, e `.` em regex de JS nao casa com \r — o
+  // `(.*)$` falharia em toda linha e o .env parecia vazio.
+  for (const linha of readFileSync(caminho, 'utf8').split(/\r?\n/)) {
+    const m = /^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/i.exec(linha);
+    if (!m) continue;
+    const valor = m[2].trim().replace(/^["']|["']$/g, '');
+    if (valor && !process.env[m[1]]) process.env[m[1]] = valor;
+  }
+}
+carregarEnv();
 
 const BUCKET = 'menu';
 const PASTA = 'produtos';
@@ -32,8 +51,23 @@ if (!arquivo) {
 
 const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !chave) {
-  console.error('Faltou VITE_SUPABASE_URL e/ou SUPABASE_SERVICE_ROLE_KEY no ambiente.');
+
+if (!url) {
+  console.error('Faltou VITE_SUPABASE_URL no ambiente (ou no .env).');
+  process.exit(1);
+}
+if (!chave) {
+  console.error('Faltou SUPABASE_SERVICE_ROLE_KEY no ambiente.');
+  console.error('  $env:SUPABASE_SERVICE_ROLE_KEY = "eyJ..."   # Supabase > Settings > API');
+  process.exit(1);
+}
+// Confundir a chave com a URL do projeto e o erro mais facil de cometer aqui, e
+// sem esta checagem o createClient so falha la na frente, com mensagem obscura.
+if (!chave.startsWith('eyJ')) {
+  console.error('SUPABASE_SERVICE_ROLE_KEY nao parece uma chave.');
+  console.error(`  recebi: ${chave.slice(0, 40)}${chave.length > 40 ? '...' : ''}`);
+  console.error('  a chave e um texto longo comecando com "eyJ", nao o endereco do projeto.');
+  console.error('  Supabase > Settings > API > service_role > Reveal');
   process.exit(1);
 }
 
