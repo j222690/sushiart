@@ -128,6 +128,7 @@ export default function ProductSheet({ product, open, onClose, isFavorite, onTog
           className="h-56 w-full"
           rounded="rounded-none"
           eager
+          fit="contain"
         />
       </div>
 
