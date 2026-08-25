@@ -11,7 +11,9 @@ import { normalizar, semelhanca, casar, CERTEZA_MINIMA } from './casar-nomes.mjs
 test('normalizar tira acento, caixa e pontuacao', () => {
   assert.equal(normalizar('Carpaccio de Salmão'), 'carpaccio de salmao');
   assert.equal(normalizar('Combo Só Salmão (35 Peças)'), 'combo so salmao 35');
-  assert.equal(normalizar('Sunomono c/ Salmão'), 'sunomono c salmao');
+  // "c/" vira "com", nao um "c" solto que o filtro de token jogaria fora.
+  assert.equal(normalizar('Sunomono c/ Salmão'), 'sunomono com salmao');
+  assert.equal(normalizar('Água S/ Gás'), 'agua sem gas');
 });
 
 test('a contagem de pecas sobrevive — e o que separa os combos', () => {
@@ -32,6 +34,24 @@ test('mesma coisa escrita diferente casa', () => {
   assert.equal(semelhanca('Carpaccio de Salmão', 'Carpaccio Salmao'), 1);
   assert.equal(semelhanca('Sunomono com Salmão', 'Sunomono c/ Salmão'), 1);
   assert.equal(semelhanca('Combo Só Salmão (35 Peças)', 'Combo Só Salmão 35 peças'), 1);
+});
+
+test('"com" e "sem" nao podem casar entre si', () => {
+  // Caso real da coleta de agosto/2026: a loja escreve "C/" e "S/", e sem
+  // tratamento os dois nomes reduzem a {agua, gas} e trocavam de foto.
+  assert.equal(semelhanca('Água com Gás', 'Água S/ Gás'), 0);
+  assert.equal(semelhanca('Água sem Gás', 'Água C/ Gás'), 0);
+  assert.equal(semelhanca('Temaki Filadélfia sem Arroz', 'Temaki Filadélfia Com Arroz'), 0);
+});
+
+test('"c/" e "s/" casam com "com" e "sem" escritos por extenso', () => {
+  assert.equal(semelhanca('Água com Gás', 'Água C/ Gás'), 1);
+  assert.equal(semelhanca('Água sem Gás', 'Água S/ Gás'), 1);
+  assert.equal(semelhanca('Sunomono com Salmão', 'Sunomono C/ Salmão'), 1);
+});
+
+test('um lado sem marcador nao contradiz o outro', () => {
+  assert.ok(semelhanca('Sunomono com Salmão', 'Sunomono Salmão') >= CERTEZA_MINIMA);
 });
 
 test('pratos diferentes que compartilham palavra nao casam', () => {

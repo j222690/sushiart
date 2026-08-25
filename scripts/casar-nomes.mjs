@@ -16,14 +16,21 @@ export const CERTEZA_MINIMA = 0.55;
 const UNIDADES = /\b(pecas?|unidades?|un)\b/g;
 
 export function normalizar(s) {
-  return s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // marcas de acento soltas pelo NFD
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ') // parentese, "+", "c/" viram espaco
-    .replace(UNIDADES, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    s
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // marcas de acento soltas pelo NFD
+      .toLowerCase()
+      // "c/" e "s/" viram palavra ANTES de a pontuacao ser varrida. Se esperar,
+      // a barra vira espaco e sobra um "c" ou "s" solto, que o filtro de token
+      // descarta por ter uma letra so \u2014 e a negacao se perde.
+      .replace(/\bc\s*\/\s*/g, 'com ')
+      .replace(/\bs\s*\/\s*/g, 'sem ')
+      .replace(/[^a-z0-9\s]/g, ' ') // parentese, "+", "." viram espaco
+      .replace(UNIDADES, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 const IRRELEVANTES = new Set(['de', 'do', 'da', 'com', 'e', 'no', 'na', 'em', 'a', 'o']);
@@ -65,8 +72,33 @@ function numerosCompativeis(a, b) {
  * mais de um lado ("Especial"), que e a diferenca tipica entre os dois
  * cardapios, sem perdoar troca de ingrediente.
  */
+/**
+ * "com" e "sem" nao sao palavra de enchimento: sao o oposto uma da outra.
+ *
+ * `Água com Gás` e `Água sem Gás` sao dois produtos, e na loja aparecem como
+ * `Água C/ Gás` e `Água S/ Gás`. Sem esta checagem os dois nomes reduzem aos
+ * mesmos tokens ({agua, gas}) e casam a 100% em ordem arbitraria — trocando a
+ * foto de um pelo outro.
+ *
+ * Um lado sem marcador nenhum nao contradiz nada: `Sunomono com Salmão` contra
+ * `Sunomono Salmão` segue valendo.
+ */
+function polaridadeCompativel(a, b) {
+  const marcadores = (s) => {
+    const t = normalizar(s).split(' ');
+    return new Set(t.filter((x) => x === 'com' || x === 'sem'));
+  };
+  const pa = marcadores(a);
+  const pb = marcadores(b);
+  if (!pa.size || !pb.size) return true;
+  if (pa.size !== pb.size) return false;
+  for (const m of pa) if (!pb.has(m)) return false;
+  return true;
+}
+
 export function semelhanca(a, b) {
   if (!numerosCompativeis(a, b)) return 0;
+  if (!polaridadeCompativel(a, b)) return 0;
 
   const ta = tokens(a);
   const tb = tokens(b);

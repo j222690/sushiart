@@ -147,74 +147,78 @@ for (const p of semFoto) {
 console.log(`\n=== FOTOS SEM DONO (${fotosSobrando.length}) ===`);
 for (const it of fotosSobrando) console.log(`  ${it.nome}`);
 
-if (!aplicar) {
-  console.log('\nNada foi baixado nem alterado. Confira a lista e rode de novo com --aplicar.');
-  process.exit(0);
-}
-
 // --- baixa, sobe, grava ------------------------------------------------------
 
-/**
- * O download tem que sair de um navegador de verdade. Requisicao comum leva 403
- * do CDN (testado com GET, User-Agent de Chrome e Referer), e do lado da pagina
- * o `fetch` esbarra em CORS. Indo direto na URL da imagem com o Playwright,
- * passa.
- */
-const browser = await chromium.launch();
-const ctx = await browser.newContext({
-  userAgent:
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-});
+// Sem `--aplicar` o trabalho acaba aqui. Nada de `process.exit(0)`: sair com o
+// cliente do Supabase ainda de pe faz o libuv abortar no Windows
+// ("Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)"), o que suja a tela
+// e devolve codigo de erro depois de uma execucao que deu certo.
+if (!aplicar) {
+  console.log('\nNada foi baixado nem alterado. Confira a lista e rode de novo com --aplicar.');
+} else {
 
-console.log('\n=== APLICANDO ===');
-let ok = 0;
-let pulados = 0;
-let falhas = 0;
+  /**
+   * O download tem que sair de um navegador de verdade. Requisicao comum leva 403
+   * do CDN (testado com GET, User-Agent de Chrome e Referer), e do lado da pagina
+   * o `fetch` esbarra em CORS. Indo direto na URL da imagem com o Playwright,
+   * passa.
+   */
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  });
 
-for (const p of comFoto) {
-  const { item } = casados.get(p.id);
+  console.log('\n=== APLICANDO ===');
+  let ok = 0;
+  let pulados = 0;
+  let falhas = 0;
 
-  if (p.image_url && !sobrescrever) {
-    pulados++;
-    continue;
-  }
+  for (const p of comFoto) {
+    const { item } = casados.get(p.id);
 
-  try {
-    const resp = await ctx.request.get(item.foto, { headers: { referer: REFERER } });
-    if (!resp.ok()) throw new Error(`download HTTP ${resp.status()}`);
-
-    const tipo = (resp.headers()['content-type'] || '').split(';')[0].trim();
-    if (!TIPOS_OK.includes(tipo)) throw new Error(`tipo nao aceito: ${tipo || 'desconhecido'}`);
-
-    const bytes = await resp.body();
-    if (bytes.length > TAMANHO_MAX) {
-      throw new Error(`${(bytes.length / 1024 / 1024).toFixed(1)} MB, acima do limite de 5 MB`);
+    if (p.image_url && !sobrescrever) {
+      pulados++;
+      continue;
     }
 
-    const ext = tipo.split('/')[1].replace('jpeg', 'jpg');
-    const caminho = `${PASTA}/${crypto.randomUUID()}.${ext}`;
+    try {
+      const resp = await ctx.request.get(item.foto, { headers: { referer: REFERER } });
+      if (!resp.ok()) throw new Error(`download HTTP ${resp.status()}`);
 
-    const { error: erroUpload } = await db.storage
-      .from(BUCKET)
-      .upload(caminho, bytes, { contentType: tipo, cacheControl: '31536000', upsert: false });
-    if (erroUpload) throw new Error(`upload: ${erroUpload.message}`);
+      const tipo = (resp.headers()['content-type'] || '').split(';')[0].trim();
+      if (!TIPOS_OK.includes(tipo)) throw new Error(`tipo nao aceito: ${tipo || 'desconhecido'}`);
 
-    const { data: pub } = db.storage.from(BUCKET).getPublicUrl(caminho);
+      const bytes = await resp.body();
+      if (bytes.length > TAMANHO_MAX) {
+        throw new Error(`${(bytes.length / 1024 / 1024).toFixed(1)} MB, acima do limite de 5 MB`);
+      }
 
-    const { error: erroUpdate } = await db.from('products').update({ image_url: pub.publicUrl }).eq('id', p.id);
-    if (erroUpdate) throw new Error(`update: ${erroUpdate.message}`);
+      const ext = tipo.split('/')[1].replace('jpeg', 'jpg');
+      const caminho = `${PASTA}/${crypto.randomUUID()}.${ext}`;
 
-    console.log(`  ok      ${p.name}  (${(bytes.length / 1024).toFixed(0)} kB)`);
-    ok++;
-  } catch (e) {
-    console.log(`  FALHOU  ${p.name} — ${e.message}`);
-    falhas++;
+      const { error: erroUpload } = await db.storage
+        .from(BUCKET)
+        .upload(caminho, bytes, { contentType: tipo, cacheControl: '31536000', upsert: false });
+      if (erroUpload) throw new Error(`upload: ${erroUpload.message}`);
+
+      const { data: pub } = db.storage.from(BUCKET).getPublicUrl(caminho);
+
+      const { error: erroUpdate } = await db.from('products').update({ image_url: pub.publicUrl }).eq('id', p.id);
+      if (erroUpdate) throw new Error(`update: ${erroUpdate.message}`);
+
+      console.log(`  ok      ${p.name}  (${(bytes.length / 1024).toFixed(0)} kB)`);
+      ok++;
+    } catch (e) {
+      console.log(`  FALHOU  ${p.name} — ${e.message}`);
+      falhas++;
+    }
   }
-}
 
-await browser.close();
+  await browser.close();
 
-console.log(`\n${ok} enviada(s), ${pulados} pulada(s) por ja ter foto, ${falhas} falha(s).`);
-if (semFoto.length) {
-  console.log(`${semFoto.length} produto(s) seguem sem foto — suba na mao em /admin/cardapio.`);
+  console.log(`\n${ok} enviada(s), ${pulados} pulada(s) por ja ter foto, ${falhas} falha(s).`);
+  if (semFoto.length) {
+    console.log(`${semFoto.length} produto(s) seguem sem foto — suba na mao em /admin/cardapio.`);
+  }
 }
