@@ -51,16 +51,22 @@ Limite de 5 MB por arquivo, apenas JPG/PNG/WEBP/AVIF.
 ### Trazer as fotos do Anota AI
 
 Para não subir as fotos uma a uma, `scripts/` importa as que já estão na loja do
-Anota AI. São dois passos, e o navegador faz **a coleta e o download**:
+Anota AI. O navegador faz só a parte que exige uma pessoa — ler os nomes e os
+links —, e o Node baixa e sobe.
 
-- a página fica atrás de Cloudflare, que bloqueia navegador automatizado
-  (testado: 403, e o Playwright leva a tela de bloqueio);
-- o CDN `client-assets.anota.ai` também devolve **403 para qualquer requisição
-  fora do navegador** — testado com GET, User-Agent de Chrome e Referer.
+A divisão não é arbitrária; foi o que sobrou depois de fechar as outras portas:
 
-Por isso o coletor embute cada foto no JSON como data URL, e o importador só
-decodifica e sobe. O seu navegador passa nos dois porque é uma pessoa acessando
-a própria loja.
+| Caminho | Resultado |
+| --- | --- |
+| Buscar a página de fora do navegador | **403** — Cloudflare bloqueia (o Playwright leva a tela de bloqueio) |
+| `fetch` da imagem, de dentro da página | **Bloqueado por CORS** — o CDN não manda `Access-Control-Allow-Origin` |
+| Ler a imagem via `<canvas>`, na página | **SecurityError** — as `<img>` carregam sem `crossorigin`, o canvas fica *tainted* |
+| Baixar a imagem com `fetch` do Node | **403** — mesmo com User-Agent de Chrome e Referer |
+| **Playwright indo direto na URL da imagem** | **200** — é o que o importador usa |
+
+O ponto é que o CDN só serve a imagem para algo que se pareça com um navegador
+de verdade, e o navegador de verdade não deixa o JavaScript da página ler os
+bytes. Um navegador headless indo direto na URL da imagem satisfaz os dois.
 
 ```bash
 # 1. Abra a loja no navegador, F12 → Console, cole scripts/coletar-fotos.js.
@@ -97,7 +103,26 @@ seu melhor quase-par, para você resolver na mão os poucos casos.
 
 Na coleta de agosto/2026 o resultado foi **51 de 53 produtos**, quase todos a
 100%. Ficaram de fora o `Suzuka`/`Suzuca` acima e `Big Roll Recheado`, que não
-tem foto na loja.
+tem foto na loja. As 57 fotos baixaram sem falha, somando 0,44 MB.
+
+### As fotos são 200×200 — e isso não tem conserto por aqui
+
+Toda foto do Anota AI está guardada em **200×200**. Cada uma aparece em duas
+URLs, uma sem extensão e outra com `.webp`; medi as duas e têm exatamente os
+mesmos pixels — a sem extensão vem como PNG de ~110 kB, a `.webp` como ~8 kB.
+O importador fica com a `.webp`: mesma imagem, 14× mais leve, e quem abre o
+cardápio costuma estar no 4G da rua.
+
+Onde isso aparece:
+
+| Tela | Tamanho exibido | Veredito |
+| --- | --- | --- |
+| Lista de produtos | 128 px de altura | aceitável |
+| Ficha do produto | 224 px de altura, largura cheia | **esticada, borra em tela 3×** |
+
+Ampliar não resolve — é o mesmo limite do logo. Se as fotos importarem e a
+ficha do produto incomodar, a saída é fotografar os pratos de novo; nenhum
+código muda, é trocar o arquivo em `/admin/cardapio`.
 
 ### Liberar acesso ao painel
 
