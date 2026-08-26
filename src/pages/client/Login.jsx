@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { Button, Input } from '../../components/ui';
+import GoogleButton from '../../components/GoogleButton';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatPhone } from '../../lib/format';
@@ -11,7 +12,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const toast = useToast();
-  const { signInWithPassword, signUp, resetPassword } = useAuth();
+  const { signInWithPassword, signUp, resetPassword, signInWithGoogle } = useAuth();
 
   const [mode, setMode] = useState('entrar'); // entrar | criar | recuperar
   const [form, setForm] = useState({ name: '', phone: '', email: '', password: '' });
@@ -114,6 +115,22 @@ export default function Login() {
           {mode === 'entrar' ? 'Entrar' : mode === 'criar' ? 'Criar conta' : 'Enviar link'}
         </Button>
       </form>
+
+      {/* Fora do modo "recuperar": ali o cliente já tem conta e está atrás da
+          senha, e oferecer outro caminho de entrada só confunde. */}
+      {mode !== 'recuperar' && (
+        <div className="mt-4">
+          <div className="mb-4 flex items-center gap-3">
+            <span className="h-px flex-1 bg-line" />
+            <span className="text-[11px] uppercase tracking-wider text-cream-faint">ou</span>
+            <span className="h-px flex-1 bg-line" />
+          </div>
+
+          {/* Volta para onde o cliente estava indo. Quem tocou em "entrar" no
+              meio do checkout precisa cair de volta no checkout, não na home. */}
+          <GoogleButton disabled={loading} onClick={() => signInWithGoogle(next)} />
+        </div>
+      )}
 
       <div className="mt-5 space-y-2 text-center text-sm">
         {mode === 'entrar' && (

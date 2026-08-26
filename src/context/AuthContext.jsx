@@ -90,6 +90,27 @@ export function AuthProvider({ children }) {
         if (error) throw new Error(friendlyError(error));
       },
 
+      /**
+       * Entrada pelo Google.
+       *
+       * `redirectTo` decide para onde o cliente volta depois de autorizar. Sem
+       * ele o Supabase manda para o Site URL, que jogaria quem entrou pelo
+       * painel na home do app — e é justamente no meio do movimento que a
+       * cozinha não quer se perder.
+       */
+      async signInWithGoogle(voltarPara = '/') {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}${voltarPara}`,
+            // Sem isto o Google pula a escolha de conta em quem já está logado,
+            // o que atrapalha quem usa uma conta para a loja e outra pessoal.
+            queryParams: { prompt: 'select_account' },
+          },
+        });
+        if (error) throw new Error(friendlyError(error));
+      },
+
       async signInWithOtp(email) {
         const { error } = await supabase.auth.signInWithOtp({
           email,
