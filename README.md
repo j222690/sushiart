@@ -120,9 +120,39 @@ Onde isso aparece:
 | Lista de produtos | 128 px de altura | aceitável |
 | Ficha do produto | 224 px de altura, largura cheia | **esticada, borra em tela 3×** |
 
-Ampliar não resolve — é o mesmo limite do logo. Se as fotos importarem e a
-ficha do produto incomodar, a saída é fotografar os pratos de novo; nenhum
-código muda, é trocar o arquivo em `/admin/cardapio`.
+Ampliar não resolve — é o mesmo limite do logo. Duas coisas amenizam: a ficha do
+produto exibe com `fit="contain"` em vez de esticar (ver `ProductImage.jsx`), e
+`scripts/retocar-fotos.mjs` passa as fotos pela OpenAI.
+
+### Retoque por IA — e onde ele não pode entrar
+
+```bash
+node scripts/backup-fotos.mjs                # SEMPRE antes: guarda os image_url
+node scripts/retocar-fotos.mjs --so 3        # ensaio
+node scripts/retocar-fotos.mjs               # todos os pratos
+node scripts/backup-fotos.mjs --restaurar backup-fotos-....json   # desfazer
+```
+
+O script baixa a foto atual, manda para `gpt-image-1` com `input_fidelity: high`,
+reduz para webp de 640 px e sobe. Nada é apagado do Storage, então desfazer é só
+reescrever a coluna. Retoma de onde parou por `retoque-feitos.json`.
+
+**Bebidas ficam de fora, e isso é obrigatório.** O modelo respeita prato
+preparado, mas não respeita texto impresso. No ensaio, a Água Crystal com gás
+voltou com o rótulo escrito *"égiia mineral"*, e a sem gás voltou como outra
+garrafa — rótulo azul diferente, texto ilegível e um cenário de madeira e pedras
+que não existia na foto. Não é ajustável por prompt: modelo de imagem erra letra
+por natureza. E rótulo é marca de terceiro. O script pula a categoria por conta
+própria.
+
+O prompt insiste em cor natural e no marmoreio do salmão. A primeira versão
+pedia *"realce as cores"* e devolvia salmão laranja-neon, com cara de peça de
+vitrine — o realce passa do ponto justamente nos pratos onde o peixe ocupa quase
+a foto toda.
+
+Vale lembrar o que o retoque é: a foto do **seu** prato, embelezada. Quanto mais
+longe do que sai da cozinha, mais reclamação de "veio diferente da foto". Foto
+nova, tirada de celular, continua sendo melhor que qualquer retoque.
 
 ### Liberar acesso ao painel
 

@@ -22,3 +22,10 @@ supabase/.temp
 
 # coleta de fotos do Anota AI (dados, nao codigo)
 fotos-anota.json
+
+backup-fotos-*.json
+retoque-feitos.json
+teste-*.png
+teste-*.jpg
+teste-*.webp
+check-*.webp
