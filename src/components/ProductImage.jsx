@@ -40,7 +40,10 @@ export default function ProductImage({
             aria-hidden="true"
             loading={eager ? 'eager' : 'lazy'}
             decoding="async"
-            className="absolute inset-0 h-full w-full scale-125 object-cover blur-2xl saturate-150"
+            // blur-lg, não blur-2xl: o desfoque custa proporcional ao raio, e a
+            // 40px isto travava a abertura da ficha no celular. Com mais escala
+            // e menos raio o fundo lê igual e sai quase de graça.
+            className="absolute inset-0 h-full w-full scale-150 object-cover blur-lg saturate-150"
           />
           <div className="absolute inset-0 bg-ink-900/40" />
           <img

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { UtensilsCrossed } from 'lucide-react';
 import clsx from 'clsx';
@@ -60,6 +60,11 @@ export default function Menu() {
 
   const tabs = useMemo(() => byCategory.map((c) => ({ slug: c.slug, name: c.name })), [byCategory]);
 
+  // Estáveis de propósito: o ProductCard é `memo`, e uma função nova a cada
+  // render anularia isso — os 53 cards voltariam a redesenhar toda vez que a
+  // rolagem troca a categoria ativa.
+  const abrirProduto = useCallback((product) => setSelected(product), []);
+
   function goToCategory(slug) {
     setParams({ categoria: slug }, { replace: true });
     sectionRefs.current[slug]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -90,7 +95,7 @@ export default function Menu() {
       {/* Abas de categoria */}
       <nav
         aria-label="Categorias"
-        className="no-scrollbar sticky top-[57px] z-20 flex gap-2 overflow-x-auto border-b border-line bg-ink-600/95 px-4 py-2.5 backdrop-blur"
+        className="no-scrollbar sticky top-[57px] z-20 flex gap-2 overflow-x-auto border-b border-line bg-ink-600 px-4 py-2.5"
       >
         {tabs.map((tab) => (
           <button
@@ -124,7 +129,7 @@ export default function Menu() {
               <ProductCard
                 key={product.id}
                 product={product}
-                onClick={() => setSelected(product)}
+                onClick={abrirProduto}
                 isFavorite={isFavorite(product.id)}
                 onToggleFavorite={user ? toggleFavorite : null}
               />

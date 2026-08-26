@@ -97,7 +97,7 @@ export default function AdminLayout() {
 
       {/* Topo (mobile) */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-ink-600/95 px-4 py-3 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-ink-600 px-4 py-3 lg:hidden">
           <button
             type="button"
             onClick={() => setMenuOpen(true)}

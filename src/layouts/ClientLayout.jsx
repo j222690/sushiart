@@ -56,7 +56,7 @@ export default function ClientLayout() {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col bg-ink md:max-w-3xl lg:max-w-5xl xl:max-w-6xl">
-      <header className="sticky top-0 z-30 border-b border-line bg-ink-600/95 backdrop-blur safe-top">
+      <header className="sticky top-0 z-30 border-b border-line bg-ink-600 safe-top">
         <div className="flex items-center gap-3 px-4 py-3">
           <button type="button" onClick={() => navigate('/')} className="min-w-0">
             <Logo size="sm" />

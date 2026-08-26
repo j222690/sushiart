@@ -17,7 +17,7 @@ export default function BottomNav({ badge }) {
       aria-label="Navegação principal"
       // No desktop a navegação sobe para o cabeçalho: barra inferior é idioma de
       // celular, e num monitor de 27" ela fica flutuando sozinha lá embaixo.
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink-600/95 backdrop-blur safe-bottom lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink-600 safe-bottom lg:hidden"
     >
       <ul className="mx-auto flex max-w-lg items-stretch">
         {TABS.map(({ to, label, icon: Icon, end }) => (

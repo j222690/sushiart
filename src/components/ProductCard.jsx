@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Flame, Sparkles, Heart, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import ProductImage from './ProductImage';
@@ -8,8 +9,14 @@ import { formatBRL } from '../lib/format';
  * Card do cardápio. Dois formatos:
  *  - list (padrão): foto à direita, como iFood — melhor para varrer o cardápio
  *  - grid: foto grande, para carrosséis de destaque
+ *
+ * Exportado com `memo` porque o cardápio tem 53 destes na tela. A tela do
+ * cardápio troca de estado a cada categoria que passa pela rolagem (para
+ * acender a aba certa), e sem o memo cada uma dessas trocas redesenhava os 53
+ * cards — medido, dava quadros de mais de um segundo num celular mediano.
+ * Para o memo valer, quem usa precisa passar funções estáveis.
  */
-export default function ProductCard({
+function ProductCard({
   product,
   onClick,
   onToggleFavorite,
@@ -43,7 +50,7 @@ export default function ProductCard({
     return (
       <button
         type="button"
-        onClick={onClick}
+        onClick={() => onClick?.(product)}
         disabled={unavailable}
         className={clsx(
           'group w-44 shrink-0 overflow-hidden rounded-card border border-line bg-ink-500 text-left shadow-card transition',
@@ -83,7 +90,7 @@ export default function ProductCard({
     >
       <button
         type="button"
-        onClick={onClick}
+        onClick={() => onClick?.(product)}
         disabled={unavailable}
         className="flex min-w-0 flex-1 gap-3 text-left"
       >
@@ -127,7 +134,7 @@ export default function ProductCard({
           onClick={() => onToggleFavorite(product)}
           aria-label={isFavorite ? 'Remover dos favoritos' : 'Salvar nos favoritos'}
           aria-pressed={isFavorite}
-          className="absolute right-2 top-2 rounded-full bg-ink-800/70 p-1.5 backdrop-blur"
+          className="absolute right-2 top-2 rounded-full bg-ink-800/90 p-1.5"
         >
           <Heart
             size={15}
@@ -138,3 +145,5 @@ export default function ProductCard({
     </div>
   );
 }
+
+export default memo(ProductCard);

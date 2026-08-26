@@ -48,7 +48,7 @@ export default function Countdown({ endsAt, onExpire, className, compact = false
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-1.5 rounded-full bg-ink-800/85 px-2.5 py-1 font-semibold tabular-nums text-cream backdrop-blur',
+        'inline-flex items-center gap-1.5 rounded-full bg-ink-800 px-2.5 py-1 font-semibold tabular-nums text-cream',
         compact ? 'text-[11px]' : 'text-xs',
         className
       )}
