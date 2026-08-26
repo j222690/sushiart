@@ -73,7 +73,9 @@ function ProductCard({
       >
         <div className="relative">
           <ProductImage src={product.image_url} alt={product.name} className="h-32 w-full" rounded="rounded-none" />
-          <div className="absolute left-2 top-2 flex flex-wrap gap-1">{flags}</div>
+          {/* Só o selo social sobre a foto — o mesmo critério da lista. O
+              percentual desceu para junto do preço, onde ele pertence. */}
+          {selo && <div className="absolute left-2 top-2">{selo}</div>}
           {unavailable && (
             <span className="absolute inset-0 grid place-items-center bg-ink-900/70 text-xs font-semibold uppercase tracking-wide text-cream">
               Esgotado
@@ -84,10 +86,15 @@ function ProductCard({
           <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-snug text-cream">
             {product.name}
           </p>
-          <div className="mt-1.5 flex items-baseline gap-1.5">
+          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
             <span className="text-sm font-bold text-cream">{formatBRL(price)}</span>
             {hasDiscount && (
-              <span className="text-[11px] text-cream-faint line-through">{formatBRL(compare)}</span>
+              <>
+                <span className="text-[11px] text-cream-faint line-through">{formatBRL(compare)}</span>
+                <span className="rounded-md bg-[#E2F0E8] px-1.5 py-0.5 text-[10px] font-bold leading-none text-success">
+                  -{off}%
+                </span>
+              </>
             )}
           </div>
         </div>

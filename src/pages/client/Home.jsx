@@ -4,6 +4,7 @@ import { ChevronRight, Gift, Flame, Sparkles, Clock, Bike } from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
 import ProductSheet from '../../components/ProductSheet';
 import OfferCard from '../../components/OfferCard';
+import SugestoesInfinitas from '../../components/SugestoesInfinitas';
 import ProductImage from '../../components/ProductImage';
 import { Badge, Button, Card, Skeleton } from '../../components/ui';
 import { home, menu, promo } from '../../lib/api';
@@ -35,7 +36,7 @@ export default function Home() {
   const navigate = useNavigate();
   const { user, customer } = useAuth();
   const { restaurant, isOpen } = useStore();
-  const { byCategory, bestsellers, loading } = useMenu();
+  const { byCategory, products, bestsellers, loading } = useMenu();
   const { isFavorite, toggleFavorite } = useFavorites();
 
   const [banners, setBanners] = useState([]);
@@ -66,6 +67,9 @@ export default function Home() {
   }, [user]);
 
   const firstName = (customer?.name || '').trim().split(' ')[0];
+
+  // Estável: o ProductCard é `memo`, e função nova a cada render anularia isso.
+  const abrirProduto = useCallback((product) => setSelected(product), []);
 
   function handleBanner(banner) {
     switch (banner.link_type) {
@@ -122,26 +126,31 @@ export default function Home() {
               key={banner.id}
               type="button"
               onClick={() => handleBanner(banner)}
-              className="relative h-36 w-[85%] shrink-0 overflow-hidden rounded-card border border-line text-left shadow-card"
+              className="relative flex h-36 w-[85%] shrink-0 flex-col justify-end overflow-hidden rounded-card bg-vinho-gradient p-5 text-left shadow-card transition-transform active:scale-[0.99]"
             >
-              <ProductImage
-                src={banner.image_url}
-                alt={banner.title}
-                className="absolute inset-0 h-full w-full"
-                rounded="rounded-none"
+              {/* Sem foto de propósito. As fotos do cardápio são quadradas e de
+                  400 px; esticadas numa faixa larga elas cortam o prato pela
+                  metade e ficam moles. Faixa da marca com tipografia forte lê
+                  melhor em qualquer tela e não depende de foto boa — que é
+                  justamente o que falta aqui. */}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-6 -top-8 h-32 w-32 rounded-full bg-white/10"
               />
-              {/* Escuro e texto claro, não o contrário. `ink-900` virou bege na
-                  virada para o tema claro, então este degradê passou a clarear
-                  a foto e apagar o texto escuro por cima dela. Sobre fotografia
-                  o par que sempre lê é véu escuro com letra clara — vale para
-                  qualquer foto que o restaurante venha a subir. */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-4">
-                <p className="font-brand text-lg leading-tight text-white drop-shadow-sm">{banner.title}</p>
-                {banner.subtitle && (
-                  <p className="mt-0.5 line-clamp-1 text-xs text-white/85">{banner.subtitle}</p>
-                )}
-              </div>
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-10 -left-4 h-24 w-24 rounded-full bg-black/10"
+              />
+
+              <p className="relative font-brand text-xl leading-tight text-white">{banner.title}</p>
+              {banner.subtitle && (
+                <p className="relative mt-1 line-clamp-2 text-xs leading-relaxed text-white/85">
+                  {banner.subtitle}
+                </p>
+              )}
+              <span className="relative mt-2.5 inline-flex w-fit items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white">
+                Ver agora
+              </span>
             </button>
           ))}
         </div>
@@ -155,10 +164,13 @@ export default function Home() {
               <Gift size={22} className="text-ember" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-cream">
+              {/* Branco, não `text-cream`: cream virou quase preto no tema
+                  claro, e sobre o gradiente vinho isso era texto escuro em
+                  fundo escuro. */}
+              <p className="text-sm font-bold text-white">
                 {spinState.can_spin ? 'Seu giro está liberado!' : 'Roleta de prêmios'}
               </p>
-              <p className="line-clamp-1 text-xs text-cream/75">
+              <p className="line-clamp-1 text-xs text-white/75">
                 {spinState.can_spin
                   ? 'Gire e ganhe desconto no pedido de hoje'
                   : spinState.reason}
@@ -226,7 +238,7 @@ export default function Home() {
           icon={Sparkles}
         >
           {recommended.map((product) => (
-            <ProductCard key={product.id} product={product} variant="grid" onClick={() => setSelected(product)} />
+            <ProductCard key={product.id} product={product} variant="grid" onClick={abrirProduto} />
           ))}
         </Rail>
       )}
@@ -235,7 +247,7 @@ export default function Home() {
       {bestsellers.length > 0 && (
         <Rail title="Mais vendidos" icon={Flame}>
           {bestsellers.map((product) => (
-            <ProductCard key={product.id} product={product} variant="grid" onClick={() => setSelected(product)} />
+            <ProductCard key={product.id} product={product} variant="grid" onClick={abrirProduto} />
           ))}
         </Rail>
       )}
@@ -278,6 +290,16 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* Fecha a home com lista que não acaba, para quem rolou tudo e ainda
+          está decidindo. Mesmo componente do cardápio: são a mesma vitrine e
+          devem continuar iguais quando uma mudar. */}
+      <SugestoesInfinitas
+        produtos={products}
+        onSelect={abrirProduto}
+        isFavorite={isFavorite}
+        onToggleFavorite={user ? toggleFavorite : null}
+      />
 
       <ProductSheet
         product={selected}
