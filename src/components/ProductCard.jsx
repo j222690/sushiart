@@ -46,13 +46,11 @@ function ProductCard({
     </>
   );
 
-  // Um selo só, na ordem em que fazem o cliente parar de rolar: desconto é o
-  // que mais converte, depois a prova social do mais vendido, e a novidade por
-  // último. No cardápio real quase todo combo é "mais vendido" — mostrar os três
-  // enchia o card de etiqueta e não destacava nada.
-  const selo = hasDiscount ? (
-    <Badge tone="success">-{off}% hoje</Badge>
-  ) : product.is_bestseller ? (
+  // Acima do nome fica só prova social — o que faz o cliente confiar antes de
+  // ler o prato. O desconto saiu daqui e foi para junto do preço: ali ele é
+  // informação de preço, e acima do nome ele empurrava o título para baixo só
+  // em alguns itens, deixando a coluna de nomes irregular ao longo da lista.
+  const selo = product.is_bestseller ? (
     <Badge tone="vinho">
       <Flame size={11} /> Mais vendido
     </Badge>
@@ -130,18 +128,30 @@ function ProductCard({
             </p>
           )}
 
-          {/* Empurra o preço para a base do card. Com os cards alinhados numa
-              coluna, o olho corre os preços em linha reta em vez de caçá-los em
-              alturas diferentes conforme o tamanho da descrição. */}
-          <div className="mt-auto flex items-baseline gap-2 pt-2">
+          {product.serves && (
+            <p className="mt-1 text-[11px] text-cream-faint">{product.serves}</p>
+          )}
+
+          {/* Empurra o preço para a base do card. Com os itens empilhados, o
+              olho corre os preços em linha reta em vez de caçá-los em alturas
+              diferentes conforme o tamanho da descrição.
+
+              Preço de/por e o percentual moram juntos porque respondem à mesma
+              pergunta — quanto custa e quanto eu economizo. */}
+          <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-2">
             <span className="text-[17px] font-extrabold leading-none text-cream">
               {formatBRL(price)}
             </span>
             {hasDiscount && (
-              <span className="text-xs text-cream-faint line-through">{formatBRL(compare)}</span>
-            )}
-            {product.serves && (
-              <span className="ml-auto text-[11px] text-cream-faint">{product.serves}</span>
+              <>
+                <span className="text-xs text-cream-faint line-through">{formatBRL(compare)}</span>
+                {/* Verde claro cravado em vez de `bg-success/12`: a 12% de
+                    opacidade sobre branco a pílula sumia e o percentual virava
+                    texto solto no meio dos preços. */}
+                <span className="rounded-md bg-[#E2F0E8] px-1.5 py-1 text-[11px] font-bold leading-none text-success">
+                  -{off}%
+                </span>
+              </>
             )}
           </div>
         </div>
