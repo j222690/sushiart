@@ -46,6 +46,22 @@ function ProductCard({
     </>
   );
 
+  // Um selo só, na ordem em que fazem o cliente parar de rolar: desconto é o
+  // que mais converte, depois a prova social do mais vendido, e a novidade por
+  // último. No cardápio real quase todo combo é "mais vendido" — mostrar os três
+  // enchia o card de etiqueta e não destacava nada.
+  const selo = hasDiscount ? (
+    <Badge tone="success">-{off}% hoje</Badge>
+  ) : product.is_bestseller ? (
+    <Badge tone="vinho">
+      <Flame size={11} /> Mais vendido
+    </Badge>
+  ) : product.is_new ? (
+    <Badge tone="ember">
+      <Sparkles size={11} /> Novidade
+    </Badge>
+  ) : null;
+
   if (variant === 'grid') {
     return (
       <button
@@ -84,45 +100,56 @@ function ProductCard({
   return (
     <div
       className={clsx(
-        'relative flex gap-3 rounded-card border border-line bg-ink-500 p-3 shadow-card transition',
-        unavailable ? 'opacity-55' : 'hover:border-vinho-500/40'
+        'group relative flex gap-3.5 rounded-card border border-line bg-ink-500 p-3 shadow-card transition-shadow',
+        unavailable ? 'opacity-55' : 'hover:shadow-lg'
       )}
     >
       <button
         type="button"
         onClick={() => onClick?.(product)}
         disabled={unavailable}
-        className="flex min-w-0 flex-1 gap-3 text-left"
+        className="flex min-w-0 flex-1 items-stretch gap-3.5 text-left"
       >
-        <div className="min-w-0 flex-1">
-          <div className="mb-1 flex flex-wrap gap-1">{flags}</div>
-          <h3 className="font-sans text-sm font-semibold leading-snug text-cream">{product.name}</h3>
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Um selo só. Três empilhados empurravam o nome para baixo e faziam
+              todo card competir por atenção — o que equivale a nenhum chamar. */}
+          {selo && <div className="mb-1.5">{selo}</div>}
+
+          <h3 className="font-sans text-[15px] font-semibold leading-tight text-cream">
+            {product.name}
+          </h3>
+
           {product.description && (
             <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-cream-muted">
               {product.description}
             </p>
           )}
-          {product.serves && (
-            <p className="mt-1 text-[11px] text-cream-faint">{product.serves}</p>
-          )}
 
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-base font-bold text-cream">{formatBRL(price)}</span>
+          {/* Empurra o preço para a base do card. Com os cards alinhados numa
+              coluna, o olho corre os preços em linha reta em vez de caçá-los em
+              alturas diferentes conforme o tamanho da descrição. */}
+          <div className="mt-auto flex items-baseline gap-2 pt-2">
+            <span className="text-[17px] font-extrabold leading-none text-cream">
+              {formatBRL(price)}
+            </span>
             {hasDiscount && (
               <span className="text-xs text-cream-faint line-through">{formatBRL(compare)}</span>
+            )}
+            {product.serves && (
+              <span className="ml-auto text-[11px] text-cream-faint">{product.serves}</span>
             )}
           </div>
         </div>
 
-        <div className="relative">
-          <ProductImage src={product.image_url} alt={product.name} className="h-24 w-24" />
+        <div className="relative shrink-0 self-center">
+          <ProductImage src={product.image_url} alt={product.name} className="h-[104px] w-[104px]" />
           {unavailable ? (
-            <span className="absolute inset-0 grid place-items-center rounded-xl bg-ink-900/75 text-[10px] font-bold uppercase tracking-wide text-cream">
+            <span className="absolute inset-0 grid place-items-center rounded-xl bg-black/60 text-[10px] font-bold uppercase tracking-wide text-white">
               Esgotado
             </span>
           ) : (
-            <span className="absolute -bottom-1.5 -right-1.5 grid h-7 w-7 place-items-center rounded-full bg-vinho-500 text-white shadow-card">
-              <Plus size={16} />
+            <span className="absolute -bottom-1.5 -right-1.5 grid h-8 w-8 place-items-center rounded-full border-2 border-ink-500 bg-vinho-500 text-white shadow-card transition-transform group-hover:scale-105">
+              <Plus size={17} strokeWidth={2.5} />
             </span>
           )}
         </div>
@@ -134,11 +161,13 @@ function ProductCard({
           onClick={() => onToggleFavorite(product)}
           aria-label={isFavorite ? 'Remover dos favoritos' : 'Salvar nos favoritos'}
           aria-pressed={isFavorite}
-          className="absolute right-2 top-2 rounded-full bg-ink-800/90 p-1.5"
+          // Sobre o card, não sobre a foto: em cima da foto ele sumia num prato
+          // claro e brigava com o botão de adicionar, que fica logo abaixo.
+          className="absolute right-2.5 top-2.5 rounded-full p-1 text-cream-faint transition-colors hover:text-vinho-500"
         >
           <Heart
-            size={15}
-            className={isFavorite ? 'fill-vinho-500 text-vinho-500' : 'text-cream-muted'}
+            size={16}
+            className={isFavorite ? 'fill-vinho-500 text-vinho-500' : ''}
           />
         </button>
       )}

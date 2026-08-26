@@ -64,13 +64,16 @@ export default function ImageUpload({ value, onChange, folder = 'produtos', labe
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/avif"
+        // image/* inclui o HEIC do iPhone, que a lista fixa deixava de fora — o
+        // seletor do telefone nem mostrava as fotos da câmera.
+        accept="image/*"
         onChange={handleFile}
         className="hidden"
       />
 
       <p className="mt-1.5 text-[11px] text-cream-faint">
-        JPG, PNG, WEBP ou AVIF até 5 MB. Fotos em fundo escuro combinam com o app.
+        Pode mandar direto da câmera do celular, inclusive iPhone. A foto é reduzida
+        aqui antes de subir.
       </p>
     </div>
   );

@@ -430,23 +430,113 @@ export const notifications = {
 // ===========================================================================
 // STORAGE (upload de fotos no admin)
 // ===========================================================================
+// Foto de celular moderno tem 3000 px ou mais no lado maior. O card do cardápio
+// mostra a 104 px e a ficha a 224 px, então 1400 px cobre tela 3x com folga —
+// e converge rápido, porque cada passada da compressão custa tempo real de CPU
+// no celular de quem está fotografando o prato na cozinha.
+const COMPRESSAO = {
+  maxSizeMB: 0.6,
+  maxWidthOrHeight: 1400,
+  useWebWorker: true,
+  initialQuality: 0.82,
+};
+
+// Upload grande em 4G instável trava sem nunca falhar: o admin vê a rodinha
+// para sempre, sem distinguir "ainda trabalhando" de "parou calado". Cortar com
+// mensagem clara é melhor, mesmo arriscando cancelar um envio lento que daria
+// certo.
+const TEMPO_LIMITE_MS = 45_000;
+
+function comLimite(promessa, ms, mensagem) {
+  let timer;
+  const estouro = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(mensagem)), ms);
+  });
+  return Promise.race([promessa, estouro]).finally(() => clearTimeout(timer));
+}
+
+// iPhone salva foto como HEIC por padrão. Nem o canvas nem o <img> de nenhum
+// navegador leem esse formato, então a compressão falha e o upload seria
+// rejeitado — justo quando alguém da equipe fotografa o prato com o telefone
+// que tem no bolso. A conversão roda no próprio navegador (WASM), sem ida ao
+// servidor.
+function ehHeic(file) {
+  const tipo = (file.type || '').toLowerCase();
+  const nome = (file.name || '').toLowerCase();
+  return (
+    tipo === 'image/heic' ||
+    tipo === 'image/heif' ||
+    nome.endsWith('.heic') ||
+    nome.endsWith('.heif')
+  );
+}
+
+async function heicParaJpeg(file) {
+  const heic2any = (await import('heic2any')).default;
+  const saida = await comLimite(
+    heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 }),
+    TEMPO_LIMITE_MS,
+    'Converter a foto do iPhone demorou demais. Tente uma foto menor.'
+  );
+  // Um HEIC pode conter várias imagens; câmera de celular manda uma só.
+  const blob = Array.isArray(saida) ? saida[0] : saida;
+  return new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+}
+
 export const storage = {
-  /** Retorna a URL pública. Valida tipo e tamanho antes de subir. */
+  /**
+   * Sobe a foto e devolve a URL pública.
+   *
+   * Aceita o que a câmera do celular produz, em vez de exigir que a pessoa
+   * saiba converter arquivo: HEIC do iPhone vira JPEG, e a imagem é reduzida
+   * aqui no navegador antes de subir. Sem isso, uma foto de 12 MP batia no
+   * limite do bucket e voltava como "a imagem precisa ter até 5 MB" — erro que
+   * não diz o que fazer.
+   */
   async uploadImage(file, folder = 'produtos') {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
-    if (!allowed.includes(file.type)) {
-      throw new Error('Use uma imagem JPG, PNG, WEBP ou AVIF.');
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error('A imagem precisa ter até 5 MB.');
+    let arquivo = file;
+
+    if (ehHeic(arquivo)) {
+      try {
+        arquivo = await heicParaJpeg(arquivo);
+      } catch (e) {
+        throw new Error(
+          `Não consegui converter essa foto do iPhone (${e.message}). ` +
+            'No iPhone: Ajustes → Câmera → Formatos → Mais compatível.'
+        );
+      }
     }
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    if (!arquivo.type.startsWith('image/')) {
+      throw new Error('Esse arquivo não é uma imagem.');
+    }
+
+    let comprimida;
+    try {
+      const imageCompression = (await import('browser-image-compression')).default;
+      comprimida = await comLimite(
+        imageCompression(arquivo, COMPRESSAO),
+        TEMPO_LIMITE_MS,
+        'Processar a imagem demorou demais. Tente uma foto menor.'
+      );
+    } catch (e) {
+      // A compressão por canvas falha em formato que o navegador não decodifica
+      // (HEIC sem extensão certa, arquivo corrompido, RAW). Dizer isso é melhor
+      // do que deixar parecer problema de rede ou do Supabase.
+      throw new Error(`Não consegui ler essa imagem (${e.message}). Tente exportar como JPG.`);
+    }
+
+    if (comprimida.size > 5 * 1024 * 1024) {
+      throw new Error('Mesmo reduzida a imagem passou de 5 MB. Tente uma foto menor.');
+    }
+
+    const tipo = comprimida.type || 'image/jpeg';
+    const ext = tipo.split('/')[1].replace('jpeg', 'jpg');
     const path = `${folder}/${crypto.randomUUID()}.${ext}`;
 
     const { error } = await supabase.storage
       .from(STORAGE_BUCKET)
-      .upload(path, file, { cacheControl: '31536000', upsert: false });
+      .upload(path, comprimida, { contentType: tipo, cacheControl: '31536000', upsert: false });
 
     if (error) throw new Error(friendlyError(error, 'Não foi possível enviar a imagem.'));
 
