@@ -4,14 +4,16 @@ import { UtensilsCrossed } from 'lucide-react';
 import clsx from 'clsx';
 import ProductCard from '../../components/ProductCard';
 import ProductSheet from '../../components/ProductSheet';
+import SugestoesInfinitas from '../../components/SugestoesInfinitas';
 import { EmptyState, Skeleton } from '../../components/ui';
 import { useMenu, useFavorites } from '../../hooks/useMenu';
 import { useAuth } from '../../context/AuthContext';
 import { menu as menuApi } from '../../lib/api';
+import { LISTA_PRODUTOS } from '../../lib/constants';
 
 export default function Menu() {
   const [params, setParams] = useSearchParams();
-  const { byCategory, loading } = useMenu();
+  const { byCategory, products, loading } = useMenu();
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const [selected, setSelected] = useState(null);
@@ -124,7 +126,7 @@ export default function Menu() {
           className="scroll-mt-28 px-4 pt-6"
         >
           <h2 className="mb-3 font-brand text-xl text-cream">{category.name}</h2>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className={LISTA_PRODUTOS}>
             {category.products.map((product) => (
               <ProductCard
                 key={product.id}
@@ -137,6 +139,16 @@ export default function Menu() {
           </div>
         </section>
       ))}
+
+      {/* Depois do cardápio ter terminado de verdade — as abas acima continuam
+          apontando para um lugar só, e a busca continua achando cada prato uma
+          vez. */}
+      <SugestoesInfinitas
+        produtos={products}
+        onSelect={abrirProduto}
+        isFavorite={isFavorite}
+        onToggleFavorite={user ? toggleFavorite : null}
+      />
 
       <ProductSheet
         product={selected}

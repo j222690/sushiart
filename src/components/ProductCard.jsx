@@ -98,10 +98,15 @@ function ProductCard({
   }
 
   return (
+    // Sem moldura própria: a lista do cardápio agrupa os itens num painel branco
+    // com linhas finas entre eles, como o iFood. Card flutuando com sombra e
+    // espaço em volta gasta altura de tela sem informar nada — e numa lista de
+    // 53 pratos isso vira rolagem à toa. A moldura volta só a partir do `md`,
+    // onde o layout é em colunas e a separação precisa vir do próprio card.
     <div
       className={clsx(
-        'group relative flex gap-3.5 rounded-card border border-line bg-ink-500 p-3 shadow-card transition-shadow',
-        unavailable ? 'opacity-55' : 'hover:shadow-lg'
+        'group relative flex gap-3.5 p-3 transition-colors',
+        unavailable ? 'opacity-55' : 'hover:bg-ink-200/60'
       )}
     >
       <button

@@ -190,3 +190,22 @@ export const PAYMENT_PROVIDERS = {
 };
 
 export const STORAGE_BUCKET = 'menu';
+
+/**
+ * Lista de produtos no formato do iFood.
+ *
+ * No celular os itens vivem dentro de um painel branco único, separados por
+ * linha fina — cabe mais prato por tela do que cards flutuando com sombra e
+ * respiro em volta, e numa lista de 53 itens isso poupa rolagem de verdade.
+ *
+ * A partir do `md` o layout vira colunas, e aí cada item precisa da própria
+ * moldura de volta, senão os cards de colunas vizinhas se encostam sem
+ * fronteira. Daí o `[&>*]:md:` devolvendo borda e sombra a cada filho.
+ */
+export const LISTA_PRODUTOS = [
+  'divide-y divide-line overflow-hidden rounded-card bg-ink-500 shadow-card',
+  'md:grid md:grid-cols-2 md:gap-3 md:divide-y-0 md:overflow-visible',
+  'md:rounded-none md:bg-transparent md:shadow-none xl:grid-cols-3',
+  '[&>*]:md:overflow-hidden [&>*]:md:rounded-card [&>*]:md:border [&>*]:md:border-line',
+  '[&>*]:md:bg-ink-500 [&>*]:md:shadow-card',
+].join(' ');
