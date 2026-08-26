@@ -130,11 +130,16 @@ export default function Home() {
                 className="absolute inset-0 h-full w-full"
                 rounded="rounded-none"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink-900/95 via-ink-900/40 to-transparent" />
+              {/* Escuro e texto claro, não o contrário. `ink-900` virou bege na
+                  virada para o tema claro, então este degradê passou a clarear
+                  a foto e apagar o texto escuro por cima dela. Sobre fotografia
+                  o par que sempre lê é véu escuro com letra clara — vale para
+                  qualquer foto que o restaurante venha a subir. */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
               <div className="absolute inset-x-0 bottom-0 p-4">
-                <p className="font-brand text-lg leading-tight text-cream">{banner.title}</p>
+                <p className="font-brand text-lg leading-tight text-white drop-shadow-sm">{banner.title}</p>
                 {banner.subtitle && (
-                  <p className="mt-0.5 line-clamp-1 text-xs text-cream-muted">{banner.subtitle}</p>
+                  <p className="mt-0.5 line-clamp-1 text-xs text-white/85">{banner.subtitle}</p>
                 )}
               </div>
             </button>

@@ -1,6 +1,6 @@
-import { forwardRef, useEffect } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import clsx from 'clsx';
-import { Loader2, X } from 'lucide-react';
+import { Eye, EyeOff, Loader2, X } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Button
@@ -97,15 +97,43 @@ const FIELD_BASE =
 
 export const Input = forwardRef(function Input({ label, hint, error, className, id, ...props }, ref) {
   const fieldId = id || props.name;
+
+  // Campo de senha ganha o olho de revelar sem que ninguém peça: senha digitada
+  // às cegas no celular é a causa nº 1 de "minha senha não funciona", ainda mais
+  // com teclado que corrige sozinho. Fica aqui, no componente compartilhado,
+  // para valer no painel, no login do cliente e em qualquer campo futuro.
+  const ehSenha = props.type === 'password';
+  const [revelada, setRevelada] = useState(false);
+
   return (
     <label className="block" htmlFor={fieldId}>
       {label && <span className="mb-1.5 block text-sm font-medium text-cream-muted">{label}</span>}
-      <input
-        ref={ref}
-        id={fieldId}
-        className={clsx(FIELD_BASE, 'h-11', error && 'border-danger', className)}
-        {...props}
-      />
+
+      <div className={ehSenha ? 'relative' : undefined}>
+        <input
+          ref={ref}
+          id={fieldId}
+          className={clsx(FIELD_BASE, 'h-11', ehSenha && 'pr-11', error && 'border-danger', className)}
+          {...props}
+          type={ehSenha && revelada ? 'text' : props.type}
+        />
+
+        {ehSenha && (
+          <button
+            type="button"
+            // Sem isto o campo perde o foco no clique e o teclado do celular
+            // fecha junto — quem revela a senha quer continuar digitando.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setRevelada((v) => !v)}
+            aria-label={revelada ? 'Ocultar senha' : 'Mostrar senha'}
+            aria-pressed={revelada}
+            className="absolute right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-cream-faint transition-colors hover:text-cream focus-visible:outline focus-visible:outline-2 focus-visible:outline-vinho-500"
+          >
+            {revelada ? <EyeOff size={17} /> : <Eye size={17} />}
+          </button>
+        )}
+      </div>
+
       {error ? (
         <span className="mt-1 block text-xs text-danger">{error}</span>
       ) : (
