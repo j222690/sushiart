@@ -1,8 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
-import { Gift, Lock } from 'lucide-react';
+import { Gift, Lock, Percent, Banknote, Bike, PartyPopper, Meh } from 'lucide-react';
 import clsx from 'clsx';
 import { Button } from './ui';
-import { LogoMark } from './Logo';
 import { formatBRL } from '../lib/format';
 
 const SPIN_MS = 4600;
@@ -22,28 +21,34 @@ function slicePath(cx, cy, radius, startAngle, endAngle) {
 }
 
 /**
- * Quebra o rótulo em linhas curtas em vez de cortar com reticências.
+ * Desenho e valor curto de cada prêmio.
  *
- * O gomo é uma fatia estreita: "Não foi dessa vez" numa linha só não cabe no
- * comprimento do raio. Em duas linhas cabe inteiro, e o cliente lê o prêmio —
- * que é o ponto da roleta.
+ * O gomo mostra figura em vez de frase: numa fatia estreita, "Hot roll grátis"
+ * só cabia deitado e miúdo. O valor continua escrito porque o desenho sozinho
+ * não distingue 5% de 15% — três prêmios são percentuais, e o cliente precisa
+ * saber qual caiu.
  */
-function quebrar(texto, maxPorLinha = 11) {
-  const palavras = texto.split(' ');
-  const linhas = [];
-  let atual = '';
-
-  for (const palavra of palavras) {
-    const tentativa = atual ? `${atual} ${palavra}` : palavra;
-    if (tentativa.length <= maxPorLinha || !atual) {
-      atual = tentativa;
-    } else {
-      linhas.push(atual);
-      atual = palavra;
-    }
+function figuraDoPremio(prize) {
+  switch (prize.prize_kind) {
+    case 'percentual':
+      return { Icone: Percent, valor: `${Number(prize.discount_percent)}%` };
+    case 'fixo':
+      // Sem os centavos quando são zero: "R$10,00" deitado no gomo encostava no
+      // miolo, e num prêmio de valor redondo os centavos não dizem nada.
+      return {
+        Icone: Banknote,
+        valor:
+          prize.discount_cents % 100 === 0
+            ? `R$${prize.discount_cents / 100}`
+            : formatBRL(prize.discount_cents).replace(/\s/g, ''),
+      };
+    case 'frete_gratis':
+      return { Icone: Bike, valor: 'FRETE' };
+    case 'brinde':
+      return { Icone: PartyPopper, valor: 'BRINDE' };
+    default:
+      return { Icone: Meh, valor: null };
   }
-  if (atual) linhas.push(atual);
-  return linhas.slice(0, 2);
 }
 
 /**
@@ -51,7 +56,8 @@ function quebrar(texto, maxPorLinha = 11) {
  *
  * O sorteio acontece no banco (spin_roulette). Este componente só recebe o
  * índice do gomo vencedor e para a animação nele — o cliente não consegue
- * influenciar o resultado mexendo no front.
+ * influenciar o resultado mexendo no front. O cupom também nasce lá: ao cair
+ * num prêmio, o banco cria um cupom pessoal com validade curta.
  */
 export default function Roulette({ prizes, canSpin, reason, onSpin, spinning: externalSpinning }) {
   const [rotation, setRotation] = useState(0);
@@ -61,7 +67,8 @@ export default function Roulette({ prizes, canSpin, reason, onSpin, spinning: ex
   const size = 320;
   const cx = size / 2;
   const cy = size / 2;
-  const radius = cx - 14;
+  const aro = cx - 4; // borda externa vermelha
+  const radius = aro - 20; // área colorida dos gomos
   const sliceAngle = prizes.length ? 360 / prizes.length : 0;
 
   const slices = useMemo(
@@ -70,25 +77,29 @@ export default function Roulette({ prizes, canSpin, reason, onSpin, spinning: ex
         const start = index * sliceAngle;
         const meio = start + sliceAngle / 2;
 
-        // O texto é desenhado no eixo horizontal e o grupo inteiro gira até o
-        // meio do gomo — assim ele lê do centro para fora, como roleta de
-        // feira, em vez de deitado atravessado na fatia.
-        //
-        // Na metade esquerda (meio > 180) essa mesma rotação deixaria a
-        // palavra de cabeça para baixo. Ali o texto é espelhado para o outro
-        // lado do centro e girado meia volta: cai no mesmo gomo, de pé.
+        // Figura e valor são desenhados no eixo horizontal e o grupo gira até o
+        // meio do gomo, para lerem do centro para fora. Na metade esquerda a
+        // mesma rotação deixaria tudo de cabeça para baixo, então ali o
+        // conteúdo é espelhado para o outro lado do centro e girado meia volta.
         const espelhado = meio > 180;
+        const lado = espelhado ? -1 : 1;
 
         return {
           prize,
           path: slicePath(cx, cy, radius, start, start + sliceAngle),
+          ...figuraDoPremio(prize),
           giro: espelhado ? meio + 90 : meio - 90,
-          textoX: espelhado ? cx - radius * 0.6 : cx + radius * 0.6,
-          linhas: quebrar(prize.label),
-          minimo: prize.min_order_cents > 0 ? formatBRL(prize.min_order_cents) : null,
+          iconeX: cx + lado * radius * 0.72,
+          valorX: cx + lado * radius * 0.44,
         };
       }),
     [prizes, sliceAngle, cx, cy, radius]
+  );
+
+  // Tachas douradas do aro, como na roleta de parque.
+  const tachas = useMemo(
+    () => Array.from({ length: 12 }, (_, i) => point(cx, cy, aro - 10, (360 / 12) * i)),
+    [cx, cy, aro]
   );
 
   async function handleSpin() {
@@ -99,14 +110,10 @@ export default function Roulette({ prizes, canSpin, reason, onSpin, spinning: ex
       const result = await onSpin();
       const index = Number(result?.index ?? 0);
 
-      // Para com o gomo sorteado sob o ponteiro (topo), com uma variação
-      // dentro do próprio gomo para não parecer sempre igual.
       const jitter = (Math.random() - 0.5) * sliceAngle * 0.55;
       const target = 360 * EXTRA_TURNS - (index * sliceAngle + sliceAngle / 2) - jitter;
 
-      // Soma sobre a rotação atual para a roda nunca "voltar" na tela.
       setRotation((current) => current + (360 - (current % 360)) + target);
-
       timerRef.current = setTimeout(() => setSpinning(false), SPIN_MS);
     } catch (error) {
       setSpinning(false);
@@ -118,12 +125,13 @@ export default function Roulette({ prizes, canSpin, reason, onSpin, spinning: ex
 
   return (
     <div className="flex flex-col items-center gap-5">
-      <div className="relative" style={{ width: size, height: size }}>
-        {/* Ponteiro */}
-        <div className="absolute left-1/2 top-[-4px] z-20 -translate-x-1/2 drop-shadow-md">
-          <svg width="28" height="32" viewBox="0 0 28 32" aria-hidden="true">
-            <path d="M14 32 L2 5 A 14 14 0 0 1 26 5 Z" fill="#8B2635" />
-            <circle cx="14" cy="10" r="4.5" fill="#F6F3EF" />
+      <div className="relative" style={{ width: size, height: size + 10 }}>
+        {/* Ponteiro fixo no topo, fora da parte que gira */}
+        <div className="absolute left-1/2 top-[-2px] z-30 -translate-x-1/2 drop-shadow-lg">
+          <svg width="30" height="36" viewBox="0 0 30 36" aria-hidden="true">
+            <path d="M15 36 L3 8 A 12 12 0 0 1 27 8 Z" fill="#D93A2B" />
+            <path d="M15 32 L6 8 A 9.5 9.5 0 0 1 24 8 Z" fill="#F0533F" />
+            <circle cx="15" cy="10" r="4" fill="#FFF3D6" />
           </svg>
         </div>
 
@@ -133,70 +141,65 @@ export default function Roulette({ prizes, canSpin, reason, onSpin, spinning: ex
           viewBox={`0 0 ${size} ${size}`}
           role="img"
           aria-label="Roleta de prêmios do Sushi Art"
-          className="drop-shadow-[0_6px_20px_rgba(139,38,53,0.20)]"
+          className="drop-shadow-[0_8px_22px_rgba(139,38,53,0.28)]"
           style={{
             transform: `rotate(${rotation}deg)`,
             transition: busy ? `transform ${SPIN_MS}ms cubic-bezier(0.12, 0.72, 0.12, 1)` : 'none',
           }}
         >
-          {/* Aro externo, no bege do app em vez do bronze do tema escuro antigo */}
-          <circle cx={cx} cy={cy} r={radius + 9} fill="#FFFFFF" />
-          <circle cx={cx} cy={cy} r={radius + 9} fill="none" stroke="#E4DDD3" strokeWidth="1.5" />
+          <defs>
+            <radialGradient id="miolo" cx="35%" cy="30%">
+              <stop offset="0%" stopColor="#FBE7A6" />
+              <stop offset="55%" stopColor="#E0A93B" />
+              <stop offset="100%" stopColor="#A9741C" />
+            </radialGradient>
+            <linearGradient id="aroVermelho" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#E8483A" />
+              <stop offset="100%" stopColor="#B92B1E" />
+            </linearGradient>
+          </defs>
 
-          {slices.map(({ prize, path, giro, textoX, linhas, minimo }) => (
+          {/* Aro externo com as tachas */}
+          <circle cx={cx} cy={cy} r={aro} fill="url(#aroVermelho)" />
+          {tachas.map(([x, y]) => (
+            <circle key={`${x}-${y}`} cx={x} cy={y} r="3.2" fill="#F5CE5E" stroke="#B98A18" strokeWidth="0.8" />
+          ))}
+
+          {/* Gomos */}
+          {slices.map(({ prize, path, Icone, valor, iconeX, valorX, giro }) => (
             <g key={prize.id}>
-              <path d={path} fill={prize.color || '#8B2635'} stroke="#FFFFFF" strokeWidth="2.5" />
+              <path d={path} fill={prize.color || '#E8455A'} stroke="#FFFFFF" strokeWidth="2" />
 
               <g transform={`rotate(${giro} ${cx} ${cy})`}>
-                <text
-                  x={textoX}
-                  y={cy}
-                  fill="#F6F3EF"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize="12.5"
-                  fontWeight="800"
-                >
-                  {linhas.map((linha, i) => (
-                    <tspan
-                      key={linha}
-                      x={textoX}
-                      dy={i === 0 ? (linhas.length > 1 ? -7 : 0) : 14}
-                    >
-                      {linha}
-                    </tspan>
-                  ))}
-                </text>
+                {/* O ícone é um <svg> do lucide; a cor vem por prop, porque ele
+                    traz o próprio `stroke` e ignora o que eu puser no pai. */}
+                <g transform={`translate(${iconeX - 14}, ${cy - 14})`}>
+                  <Icone size={28} color="#FFFFFF" strokeWidth={2.4} absoluteStrokeWidth />
+                </g>
 
-                {/* O requisito vive junto do prêmio: ninguém gira imaginando que
-                    "10% OFF" vale para qualquer pedido. */}
-                {minimo && (
+                {valor && (
                   <text
-                    x={textoX}
-                    y={cy + (linhas.length > 1 ? 22 : 15)}
-                    fill="#F6F3EF"
-                    fillOpacity="0.78"
+                    x={valorX}
+                    y={cy}
+                    fill="#FFFFFF"
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fontSize="9"
-                    fontWeight="600"
+                    fontSize={valor.length > 5 ? 11 : 15}
+                    fontWeight="900"
+                    letterSpacing={valor.length > 5 ? 0.5 : 0}
                   >
-                    a partir de {minimo}
+                    {valor}
                   </text>
                 )}
               </g>
             </g>
           ))}
 
-          <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#FFFFFF" strokeWidth="3" />
+          {/* Miolo dourado */}
+          <circle cx={cx} cy={cy} r="34" fill="#FFFFFF" />
+          <circle cx={cx} cy={cy} r="30" fill="url(#miolo)" stroke="#A9741C" strokeWidth="1.5" />
+          <circle cx={cx} cy={cy} r="11" fill="#C9911F" opacity="0.55" />
         </svg>
-
-        {/* Miolo com a marca */}
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
-          <div className="grid h-[68px] w-[68px] place-items-center rounded-full border-4 border-white bg-white shadow-card">
-            <LogoMark size={52} />
-          </div>
-        </div>
       </div>
 
       <Button
@@ -218,9 +221,31 @@ export default function Roulette({ prizes, canSpin, reason, onSpin, spinning: ex
         )}
       </Button>
 
-      {!canSpin && reason && (
-        <p className="max-w-xs text-center text-xs text-cream-muted">{reason}</p>
-      )}
+      {!canSpin && reason && <p className="max-w-xs text-center text-xs text-cream-muted">{reason}</p>}
+
+      {/* Legenda: o gomo mostra a figura, aqui fica o nome por extenso e o
+          mínimo de cada prêmio. Ninguém gira imaginando que "10% OFF" vale
+          para qualquer pedido e descobre a regra só no carrinho. */}
+      <ul className="w-full max-w-xs space-y-1.5">
+        {slices
+          .filter(({ prize }) => prize.prize_kind)
+          .map(({ prize, Icone }) => (
+            <li key={prize.id} className="flex items-center gap-2.5 text-xs">
+              <span
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-md"
+                style={{ backgroundColor: prize.color || '#E8455A' }}
+              >
+                <Icone size={13} className="text-white" />
+              </span>
+              <span className="font-semibold text-cream">{prize.label}</span>
+              {prize.min_order_cents > 0 && (
+                <span className="ml-auto text-cream-faint">
+                  a partir de {formatBRL(prize.min_order_cents)}
+                </span>
+              )}
+            </li>
+          ))}
+      </ul>
     </div>
   );
 }
