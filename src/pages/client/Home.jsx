@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import clsx from 'clsx';
 import { ChevronRight, Gift, Flame, Sparkles, Clock, Bike } from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
 import ProductSheet from '../../components/ProductSheet';
 import OfferCard from '../../components/OfferCard';
 import SugestoesInfinitas from '../../components/SugestoesInfinitas';
+import PopupOfertas from '../../components/PopupOfertas';
 import ProductImage from '../../components/ProductImage';
 import { Badge, Button, Card, Skeleton } from '../../components/ui';
 import { home, menu, promo } from '../../lib/api';
@@ -12,6 +14,7 @@ import { useMenu, useFavorites } from '../../hooks/useMenu';
 import { useStore } from '../../context/StoreContext';
 import { useAuth } from '../../context/AuthContext';
 import { formatBRL } from '../../lib/format';
+import { emojiCategoria, fundoCategoria } from '../../lib/emojiCategoria';
 
 /** Faixa horizontal reutilizada nos vários carrosséis da home. */
 function Rail({ title, subtitle, icon: Icon, action, children }) {
@@ -93,6 +96,10 @@ export default function Home() {
 
   return (
     <div className="pb-4">
+      {/* Só na home: é a porta de entrada. Nas outras telas o cliente já está
+          fazendo alguma coisa, e interromper ali custa pedido. */}
+      <PopupOfertas />
+
       {/* Saudação + tempo de entrega */}
       <section className="bg-ember-glow px-4 pb-2 pt-4">
         <p className="font-brand text-xl text-cream">
@@ -159,31 +166,55 @@ export default function Home() {
       {/* Chamada da roleta */}
       {spinState && (
         <div className="mt-5 px-4">
-          <Card className="flex items-center gap-3 overflow-hidden bg-vinho-gradient p-4">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink-900/40">
-              <Gift size={22} className="text-ember" />
-            </span>
-            <div className="min-w-0 flex-1">
-              {/* Branco, não `text-cream`: cream virou quase preto no tema
-                  claro, e sobre o gradiente vinho isso era texto escuro em
-                  fundo escuro. */}
-              <p className="text-sm font-bold text-white">
-                {spinState.can_spin ? 'Seu giro está liberado!' : 'Roleta de prêmios'}
-              </p>
-              <p className="line-clamp-1 text-xs text-white/75">
-                {spinState.can_spin
-                  ? 'Gire e ganhe desconto no pedido de hoje'
-                  : spinState.reason}
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="ember"
-              onClick={() => navigate('/ofertas#roleta')}
-              disabled={!spinState.can_spin}
-            >
-              Girar
-            </Button>
+          {/* Com giro disponível a chamada ocupa a largura toda e pulsa; sem
+              giro ela encolhe para uma linha. O convite só merece a tela
+              enquanto ele vale — depois de girado, virar mobília seria pior do
+              que sumir. */}
+          <Card
+            className={clsx(
+              'relative overflow-hidden bg-vinho-gradient',
+              spinState.can_spin ? 'p-5' : 'flex items-center gap-3 p-4'
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10"
+            />
+
+            {spinState.can_spin ? (
+              <div className="relative flex items-center gap-4">
+                <span className="grid h-16 w-16 shrink-0 animate-pulse-glow place-items-center rounded-full bg-white/15 text-4xl">
+                  🎡
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-brand text-lg leading-tight text-white">Seu giro está liberado!</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-white/80">
+                    Gire e ganhe desconto para usar hoje mesmo
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="ember"
+                    className="mt-2.5"
+                    onClick={() => navigate('/ofertas#roleta')}
+                  >
+                    <Gift size={15} /> Girar agora
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/15 text-2xl">
+                  🎡
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-white">Roleta de prêmios</p>
+                  <p className="line-clamp-1 text-xs text-white/75">{spinState.reason}</p>
+                </div>
+                <Button size="sm" variant="ember" disabled>
+                  Girar
+                </Button>
+              </>
+            )}
           </Card>
         </div>
       )}
@@ -264,23 +295,33 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            {byCategory.map((category) => (
+            {byCategory.map((category, i) => (
               <button
                 key={category.id}
                 type="button"
                 onClick={() => navigate(`/cardapio?categoria=${category.slug}`)}
-                className="relative h-24 overflow-hidden rounded-card border border-line text-left shadow-card"
+                // Sem foto, como as faixas do topo. A foto de um prato recortada
+                // num retângulo de 96 px não mostra prato nenhum — vira mancha
+                // colorida. Emoji grande diz a categoria de longe, e o fundo em
+                // cor cheia dá o destaque que a foto não estava dando.
+                className={clsx(
+                  'relative h-24 overflow-hidden rounded-card bg-gradient-to-br p-3 text-left shadow-card',
+                  'transition-transform active:scale-[0.98]',
+                  fundoCategoria(i)
+                )}
               >
-                <ProductImage
-                  src={category.image_url || category.products[0]?.image_url}
-                  alt={category.name}
-                  className="absolute inset-0 h-full w-full"
-                  rounded="rounded-none"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-ink-900/90 to-transparent" />
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-3 -top-2 select-none text-[56px] leading-none opacity-25"
+                >
+                  {emojiCategoria(category)}
+                </span>
+                <span aria-hidden="true" className="relative block text-2xl leading-none">
+                  {emojiCategoria(category)}
+                </span>
                 <div className="absolute inset-x-0 bottom-0 p-3">
-                  <p className="font-brand text-sm text-cream">{category.name}</p>
-                  <p className="text-[10px] text-cream-muted">
+                  <p className="font-brand text-sm text-white">{category.name}</p>
+                  <p className="text-[10px] text-white/70">
                     {category.products.length} itens · a partir de{' '}
                     {formatBRL(Math.min(...category.products.map((p) => p.effective_price_cents)))}
                   </p>
