@@ -32,3 +32,4 @@ check-*.webp
 dev.log
 
 vapid.txt
+push-secret.txt
