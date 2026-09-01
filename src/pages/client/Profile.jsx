@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   User, MapPin, Heart, Sparkles, Bell, LogOut, ChevronRight, Clock, Instagram, ShieldCheck,
 } from 'lucide-react';
@@ -189,13 +189,13 @@ export default function Profile() {
           de privacidade está de fato alcançável dentro do app, não só no
           cadastro do OAuth. */}
       <nav className="mt-6 flex items-center justify-center gap-3 text-[11px]">
-        <Link to="/privacidade" className="text-cream-faint underline-offset-2 hover:text-cream-muted hover:underline">
+        <a href="/privacidade" className="text-cream-faint underline-offset-2 hover:text-cream-muted hover:underline">
           Privacidade
-        </Link>
+        </a>
         <span aria-hidden="true" className="text-cream-faint">·</span>
-        <Link to="/termos" className="text-cream-faint underline-offset-2 hover:text-cream-muted hover:underline">
+        <a href="/termos" className="text-cream-faint underline-offset-2 hover:text-cream-muted hover:underline">
           Termos de uso
-        </Link>
+        </a>
       </nav>
 
       <p className="mt-2 text-center text-[11px] text-cream-faint">

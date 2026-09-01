@@ -1,4 +1,10 @@
 # SPA: toda rota cai no index.html, senao /admin e /pedidos/:id dao 404 no refresh.
 # Arquivo real (asset, sw.js, manifest) tem prioridade sobre esta regra.
 # Lido por Netlify e por Cloudflare Pages. Na Vercel quem manda e o vercel.json.
+# Estas duas antes da regra geral: a ordem manda, e a primeira que casar vence.
+# Servidas como HTML pronto, tem conteudo para quem nao executa JavaScript — o
+# verificador do Google, o robo de busca e a previa de link do WhatsApp.
+/privacidade  /privacidade.html  200
+/termos       /termos.html       200
+
 /*    /index.html   200
