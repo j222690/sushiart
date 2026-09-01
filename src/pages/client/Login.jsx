@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { Button, Input } from '../../components/ui';
@@ -155,9 +155,19 @@ export default function Login() {
         )}
       </div>
 
-      <p className="mt-auto pb-6 pt-8 text-center text-[11px] text-cream-faint">
-        Ao continuar você concorda em receber avisos sobre o status dos seus pedidos.
-      </p>
+      <div className="mt-auto pb-6 pt-8 text-center text-[11px] leading-relaxed text-cream-faint">
+        <p>Ao continuar você concorda em receber avisos sobre o status dos seus pedidos.</p>
+        <p className="mt-1.5">
+          Leia nossa{' '}
+          <Link to="/privacidade" className="underline underline-offset-2 hover:text-cream-muted">
+            Política de Privacidade
+          </Link>{' '}
+          e os{' '}
+          <Link to="/termos" className="underline underline-offset-2 hover:text-cream-muted">
+            Termos de uso
+          </Link>.
+        </p>
+      </div>
     </div>
   );
 }

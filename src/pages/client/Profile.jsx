@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   User, MapPin, Heart, Sparkles, Bell, LogOut, ChevronRight, Clock, Instagram, ShieldCheck,
 } from 'lucide-react';
@@ -184,7 +184,21 @@ export default function Profile() {
         <LogOut size={16} /> Sair da conta
       </Button>
 
-      <p className="mt-6 text-center text-[11px] text-cream-faint">
+      {/* Rodapé legal. Fica aqui, no fim do Perfil, porque é onde as pessoas
+          procuram esse tipo de link — e porque o Google confere se a política
+          de privacidade está de fato alcançável dentro do app, não só no
+          cadastro do OAuth. */}
+      <nav className="mt-6 flex items-center justify-center gap-3 text-[11px]">
+        <Link to="/privacidade" className="text-cream-faint underline-offset-2 hover:text-cream-muted hover:underline">
+          Privacidade
+        </Link>
+        <span aria-hidden="true" className="text-cream-faint">·</span>
+        <Link to="/termos" className="text-cream-faint underline-offset-2 hover:text-cream-muted hover:underline">
+          Termos de uso
+        </Link>
+      </nav>
+
+      <p className="mt-2 text-center text-[11px] text-cream-faint">
         {restaurant?.name} · {restaurant?.address_city}/{restaurant?.address_state}
       </p>
 

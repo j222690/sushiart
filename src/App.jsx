@@ -26,6 +26,8 @@ const Addresses = lazy(() => import('./pages/client/Addresses'));
 const Loyalty = lazy(() => import('./pages/client/Loyalty'));
 const Notifications = lazy(() => import('./pages/client/Notifications'));
 const Login = lazy(() => import('./pages/client/Login'));
+const Privacidade = lazy(() => import('./pages/client/Privacidade'));
+const Termos = lazy(() => import('./pages/client/Termos'));
 
 // O painel só é baixado por quem realmente abre /admin.
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
@@ -99,6 +101,12 @@ function AppRoutes() {
 
         {/* Login do cliente fica fora do layout: sem bottom nav nem carrinho. */}
         <Route path="/entrar" element={<Login />} />
+
+        {/* Páginas legais, públicas e fora do layout da loja. O Google abre
+            estes endereços na análise do OAuth, e quem ainda não criou conta
+            precisa poder ler antes de decidir. */}
+        <Route path="/privacidade" element={<Privacidade />} />
+        <Route path="/termos" element={<Termos />} />
 
         {/* --------------------------------- Painel --------------------------------- */}
         <Route path="/admin/entrar" element={<AdminLogin />} />
