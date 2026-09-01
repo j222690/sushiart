@@ -38,6 +38,37 @@ export const adminPrizes = crud('roulette_prizes', 'sort_order');
 export const adminZones = crud('delivery_zones', 'neighborhood');
 export const adminHours = crud('business_hours', 'weekday');
 
+/**
+ * Dias de exceção — feriado, folga, evento.
+ *
+ * A chave primária é a própria data, não um `id`, porque não faz sentido ter
+ * duas regras para o mesmo dia. Por isso o CRUD genérico não serve: ele apaga
+ * e atualiza por `id`.
+ */
+export const adminExcecoes = {
+  /** Só de hoje em diante: dia que já passou não muda mais nada. */
+  async list() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    return unwrap(
+      await supabase.from('business_exceptions').select('*').gte('date', hoje).order('date'),
+      'Não foi possível carregar os dias de exceção.'
+    );
+  },
+
+  /** Grava por data: marcar o mesmo dia de novo corrige, em vez de duplicar. */
+  async save(row) {
+    return unwrap(
+      await supabase.from('business_exceptions').upsert(row, { onConflict: 'date' }).select().single(),
+      'Não foi possível salvar o dia.'
+    );
+  },
+
+  async remove(date) {
+    const { error } = await supabase.from('business_exceptions').delete().eq('date', date);
+    if (error) throw new Error(friendlyError(error, 'Não foi possível remover o dia.'));
+  },
+};
+
 // ---------------------------------------------------------------------------
 // Produtos e adicionais
 // ---------------------------------------------------------------------------

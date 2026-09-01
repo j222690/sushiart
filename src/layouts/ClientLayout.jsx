@@ -36,7 +36,7 @@ function nextOpening(hours) {
 export default function ClientLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isOpen, hours, restaurant } = useStore();
+  const { isOpen, closedReason, hours, restaurant } = useStore();
   const { user } = useAuth();
   const count = useCart((s) => s.count());
   const subtotal = useCart((s) => s.subtotal());
@@ -110,8 +110,15 @@ export default function ClientLayout() {
         {!isOpen && (
           <div className="border-t border-warning/25 bg-warning/10 px-4 py-2 text-center text-xs text-warning">
             <strong className="font-semibold">Estamos fechados.</strong>{' '}
-            {opening ? `Abrimos ${opening}.` : 'Confira nossos horários no perfil.'} Você pode montar
-            seu carrinho agora.
+            {/* Dia de exceção manda na mensagem: "abrimos às 18:30" seria mentira
+                num feriado, e é justamente nesses dias que o cliente liga para
+                perguntar. Sem exceção, vale o horário normal. */}
+            {closedReason
+              ? `${closedReason}.`
+              : opening
+                ? `Abrimos ${opening}.`
+                : 'Confira nossos horários no perfil.'}{' '}
+            Você pode montar seu carrinho agora.
           </div>
         )}
       </header>

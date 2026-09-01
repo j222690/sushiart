@@ -151,6 +151,16 @@ export const settings = {
     return Boolean(data);
   },
 
+  /**
+   * Motivo do fechamento de hoje, quando é dia de exceção. Null quando a casa
+   * está apenas fora do horário — aí vale a mensagem de "abrimos às tal hora".
+   */
+  async closedReason() {
+    const { data, error } = await supabase.rpc('closed_reason_today');
+    if (error) return null;
+    return data || null;
+  },
+
   async paymentMethods() {
     return unwrap(
       await supabase.from('payment_config').select('*').eq('is_active', true).order('sort_order'),

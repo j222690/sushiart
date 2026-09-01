@@ -304,24 +304,33 @@ export default function Home() {
                 // num retângulo de 96 px não mostra prato nenhum — vira mancha
                 // colorida. Emoji grande diz a categoria de longe, e o fundo em
                 // cor cheia dá o destaque que a foto não estava dando.
+                // Coluna com o texto empurrado para baixo, em vez do texto solto
+                // em `absolute bottom-0`: naquele arranjo o emoji ficava no
+                // fluxo e o título fora dele, então num card de 96 px os dois se
+                // encontravam e o nome passava por cima da figura. Em coluna
+                // eles não têm como se sobrepor, em qualquer altura de card.
                 className={clsx(
-                  'relative h-24 overflow-hidden rounded-card bg-gradient-to-br p-3 text-left shadow-card',
+                  'relative flex h-24 flex-col overflow-hidden rounded-card bg-gradient-to-br p-3 text-left shadow-card',
                   'transition-transform active:scale-[0.98]',
                   fundoCategoria(i)
                 )}
               >
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-3 -top-2 select-none text-[56px] leading-none opacity-25"
+                  className="pointer-events-none absolute -right-3 -top-3 select-none text-[54px] leading-none opacity-20"
                 >
                   {emojiCategoria(category)}
                 </span>
-                <span aria-hidden="true" className="relative block text-2xl leading-none">
+
+                <span aria-hidden="true" className="relative text-xl leading-none">
                   {emojiCategoria(category)}
                 </span>
-                <div className="absolute inset-x-0 bottom-0 p-3">
-                  <p className="font-brand text-sm text-white">{category.name}</p>
-                  <p className="text-[10px] text-white/70">
+
+                <div className="relative mt-auto min-w-0">
+                  <p className="truncate font-brand text-sm leading-tight text-white">
+                    {category.name}
+                  </p>
+                  <p className="truncate text-[10px] text-white/70">
                     {category.products.length} itens · a partir de{' '}
                     {formatBRL(Math.min(...category.products.map((p) => p.effective_price_cents)))}
                   </p>

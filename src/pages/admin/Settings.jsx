@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Trash2, Store, Clock, Bike, Save, MapPinned} from 'lucide-react';
+import { Plus, Trash2, Store, Clock, Bike, Save, MapPinned, CalendarOff } from 'lucide-react';
 import { Badge, Button, Card, Input, Skeleton, Switch } from '../../components/ui';
 import ImageUpload from '../../components/admin/ImageUpload';
-import { adminSettings, adminZones, adminHours } from '../../lib/adminApi';
+import { adminSettings, adminZones, adminHours, adminExcecoes } from '../../lib/adminApi';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { centsToInput, formatBRL, parseBRLToCents, shortHour, WEEKDAYS } from '../../lib/format';
+
+/** 'YYYY-MM-DD' → 'quarta-feira, 3 de setembro'. */
+function dataPorExtenso(iso) {
+  const [ano, mes, dia] = iso.split('-').map(Number);
+  // Meio-dia local evita o pulo de um dia que `new Date('2026-09-03')` causa:
+  // aquela forma é lida como UTC, e no fuso de São Paulo cai na véspera.
+  return new Date(ano, mes - 1, dia, 12).toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+}
 
 export default function Settings() {
   const toast = useToast();
@@ -14,17 +26,21 @@ export default function Settings() {
   const [restaurant, setRestaurant] = useState(null);
   const [zones, setZones] = useState([]);
   const [hours, setHours] = useState([]);
+  const [excecoes, setExcecoes] = useState([]);
   const [saving, setSaving] = useState(false);
 
   const [newZone, setNewZone] = useState({ neighborhood: '', fee: '', eta_min: 45, min_order: '' });
   const [newHour, setNewHour] = useState({ weekday: 2, opens_at: '18:30', closes_at: '23:30' });
+  // Nasce com a data de hoje: fechar hoje é o caso mais comum e o mais urgente.
+  const [novoDia, setNovoDia] = useState({ date: new Date().toISOString().slice(0, 10), reason: '' });
 
   const load = useCallback(async () => {
     try {
-      const [r, z, h] = await Promise.all([
+      const [r, z, h, e] = await Promise.all([
         adminSettings.restaurant(),
         adminZones.list('neighborhood'),
         adminHours.list('weekday'),
+        adminExcecoes.list(),
       ]);
       setRestaurant({
         ...r,
@@ -32,6 +48,7 @@ export default function Settings() {
       });
       setZones(z);
       setHours(h);
+      setExcecoes(e);
     } catch (error) {
       toast.error(error.message);
     }
@@ -88,6 +105,28 @@ export default function Settings() {
     } catch (error) {
       toast.error(error.message);
       await load();
+    }
+  }
+
+  async function fecharDia() {
+    if (!novoDia.date) {
+      toast.error('Escolha a data.');
+      return;
+    }
+    try {
+      await adminExcecoes.save({
+        date: novoDia.date,
+        closed: true,
+        reason: novoDia.reason.trim() || null,
+      });
+      await load();
+      // Recarrega o contexto da loja: a tarja do topo do app do cliente muda
+      // na hora, sem esperar o intervalo de um minuto.
+      await reloadStore();
+      setNovoDia((c) => ({ ...c, reason: '' }));
+      toast.success('Dia marcado como fechado.');
+    } catch (error) {
+      toast.error(error.message);
     }
   }
 
@@ -303,6 +342,86 @@ export default function Settings() {
           <p className="mt-2 text-[11px] text-cream-faint">
             Para virada de madrugada (ex: 19h às 00h30), cadastre até 23:59 — o app usa o fuso de
             São Paulo para decidir se está aberto.
+          </p>
+        </Card>
+
+        {/* Dias de exceção */}
+        <Card className="p-4">
+          <h2 className="mb-1 flex items-center gap-2 font-brand text-lg text-cream">
+            <CalendarOff size={17} className="text-vinho-300" /> Dias fechados e aberturas especiais
+          </h2>
+          <p className="mb-4 text-xs text-cream-faint">
+            Vale para uma data específica e manda no horário de cima. Use para feriado, folga ou
+            férias — e também para abrir num dia que normalmente estaria fechado.
+          </p>
+
+          <div className="space-y-2">
+            {excecoes.length === 0 && (
+              <p className="rounded-xl border border-dashed border-line px-3 py-4 text-center text-xs text-cream-faint">
+                Nenhum dia marcado. O app segue o horário da semana.
+              </p>
+            )}
+
+            {excecoes.map((dia) => (
+              <div
+                key={dia.date}
+                className="flex items-center gap-2.5 rounded-xl border border-line bg-ink-300 p-3"
+              >
+                <Badge tone={dia.closed ? 'danger' : 'success'}>
+                  {dia.closed ? 'Fechado' : 'Aberto'}
+                </Badge>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-cream">{dataPorExtenso(dia.date)}</p>
+                  <p className="truncate text-[11px] text-cream-faint">
+                    {dia.closed
+                      ? dia.reason || 'Sem motivo informado'
+                      : `${shortHour(dia.opens_at)} – ${shortHour(dia.closes_at)}${dia.reason ? ` · ${dia.reason}` : ''}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Remover dia"
+                  onClick={async () => {
+                    await adminExcecoes.remove(dia.date);
+                    await load();
+                    await reloadStore();
+                  }}
+                  className="shrink-0 text-cream-faint hover:text-danger"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-line pt-4">
+            <label className="min-w-[140px] flex-1">
+              <span className="mb-1.5 block text-xs text-cream-muted">Data</span>
+              <input
+                type="date"
+                value={novoDia.date}
+                onChange={(e) => setNovoDia((c) => ({ ...c, date: e.target.value }))}
+                className="h-10 w-full rounded-xl border border-line bg-ink-300 px-2 text-sm text-cream"
+              />
+            </label>
+            <label className="min-w-[160px] flex-[2]">
+              <span className="mb-1.5 block text-xs text-cream-muted">Motivo (aparece para o cliente)</span>
+              <input
+                type="text"
+                value={novoDia.reason}
+                onChange={(e) => setNovoDia((c) => ({ ...c, reason: e.target.value }))}
+                placeholder="Feriado, folga da equipe…"
+                className="h-10 w-full rounded-xl border border-line bg-ink-300 px-2 text-sm text-cream placeholder:text-cream-faint"
+              />
+            </label>
+            <Button size="md" onClick={fecharDia}>
+              <Plus size={15} /> Fechar dia
+            </Button>
+          </div>
+
+          <p className="mt-2 text-[11px] text-cream-faint">
+            O motivo aparece na tarja do topo do app. Sem motivo, o cliente vê apenas que está
+            fechado.
           </p>
         </Card>
 

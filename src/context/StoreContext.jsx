@@ -13,22 +13,25 @@ export function StoreProvider({ children }) {
   const [zones, setZones] = useState([]);
   const [methods, setMethods] = useState([]);
   const [isOpen, setIsOpen] = useState(true);
+  const [closedReason, setClosedReason] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [r, h, z, m, open] = await Promise.all([
+      const [r, h, z, m, open, motivo] = await Promise.all([
         settings.restaurant(),
         settings.hours(),
         settings.zones(),
         settings.paymentMethods(),
         settings.isOpen(),
+        settings.closedReason(),
       ]);
       setRestaurant(r);
       setHours(h);
       setZones(z.filter((zone) => zone.active));
       setMethods(m);
       setIsOpen(open);
+      setClosedReason(motivo);
     } catch {
       // Sem conexão: o app continua navegável, mas com o aviso de fechado.
       setIsOpen(false);
@@ -41,7 +44,10 @@ export function StoreProvider({ children }) {
     load();
     // O status abre/fecha sozinho no horário — revalida de minuto em minuto
     // para o cliente não conseguir finalizar um pedido depois do fechamento.
-    const timer = setInterval(() => settings.isOpen().then(setIsOpen), 60_000);
+    const timer = setInterval(() => {
+      settings.isOpen().then(setIsOpen);
+      settings.closedReason().then(setClosedReason);
+    }, 60_000);
     return () => clearInterval(timer);
   }, [load]);
 
@@ -62,7 +68,7 @@ export function StoreProvider({ children }) {
 
   return (
     <StoreContext.Provider
-      value={{ restaurant, hours, zones, methods, isOpen, loading, reload: load, zoneFor }}
+      value={{ restaurant, hours, zones, methods, isOpen, closedReason, loading, reload: load, zoneFor }}
     >
       {children}
     </StoreContext.Provider>
