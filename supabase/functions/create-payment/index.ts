@@ -280,8 +280,19 @@ async function createMercadoPagoCheckout(order: any, appOrigin: string): Promise
   return {
     provider: 'mercadopago',
     reference: String(preference.id),
-    // sandbox_init_point só existe com credencial de teste — usar quando vier.
-    checkout_url: preference.sandbox_init_point ?? preference.init_point,
+    // `init_point` sempre, exceto com credencial de teste.
+    //
+    // A versão anterior preferia `sandbox_init_point` supondo que ele só
+    // aparecesse em credencial de teste. Não é o caso: o Mercado Pago devolve
+    // os dois campos sempre. Com token de produção isso mandava o cliente para
+    // o checkout de sandbox, onde ele "pagaria" com dinheiro de mentira e o
+    // restaurante nunca receberia — e nada no fluxo acusaria o erro, porque a
+    // preferência é criada com sucesso nos dois casos.
+    //
+    // Quem sabe o ambiente é o token: o de teste começa com `TEST-`.
+    checkout_url: requireEnv('MERCADOPAGO_ACCESS_TOKEN').startsWith('TEST-')
+      ? (preference.sandbox_init_point ?? preference.init_point)
+      : preference.init_point,
     payload: { mercadopago: { preference_id: preference.id } },
   };
 }
