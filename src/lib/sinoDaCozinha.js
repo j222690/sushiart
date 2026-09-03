@@ -16,14 +16,24 @@
  *
  * Ela toca o som padrão do aparelho, que é o mesmo de qualquer mensagem — e no
  * meio do serviço ninguém distingue "chegou pedido" de "chegou WhatsApp". Este
- * toque é diferente de propósito: dois sinos em intervalo de quinta, repetidos,
- * que ninguém confunde com outra coisa.
+ * toque é diferente de propósito e ninguém confunde com outra coisa.
  */
 
-/** Um toque: dois tons curtos, como sino de balcão. */
+/**
+ * Um toque: três tons subindo, curtos e agudos.
+ *
+ * Ficou mais agudo que a versão anterior (880/1320 Hz) porque grave se perde:
+ * exaustor, fritadeira e conversa vivem na faixa baixa, e um som ali some no
+ * meio de tudo. Acima de 1,5 kHz o ouvido separa do ruído de cozinha mesmo com
+ * a máquina ligada.
+ *
+ * Subindo em vez de dois tons alternados: sequência ascendente lê como alarme,
+ * e é isso que se quer — não um "pling" simpático que a pessoa ignora.
+ */
 const NOTAS = [
-  { hz: 880, inicio: 0, duracao: 0.18 },   // lá
-  { hz: 1320, inicio: 0.16, duracao: 0.32 }, // mi, uma quinta acima
+  { hz: 1568, inicio: 0, duracao: 0.14 },    // sol 6
+  { hz: 2093, inicio: 0.12, duracao: 0.14 }, // dó 7
+  { hz: 2637, inicio: 0.24, duracao: 0.30 }, // mi 7
 ];
 
 let contexto = null;
@@ -91,44 +101,87 @@ export function liberarNoPrimeiroToque() {
 }
 
 /**
- * Toca o sino.
+ * Toca o alarme de pedido novo.
  *
- * @param {number} repeticoes quantas vezes. Pedido novo usa 3: uma só se perde
- *                            no barulho da cozinha.
+ * Desenhado para ser ouvido do outro lado da cozinha, com exaustor ligado.
+ * A primeira versão era um "pling" educado de dois tons: tocava, e ninguém se
+ * ligava que tinha saído pedido — que é o mesmo que não tocar.
+ *
+ * O que faz ele cortar o ruído:
+ *
+ *   DURA.        Uns dois segundos e meio, não meio. Alarme curto acontece
+ *                enquanto a pessoa está de mãos na massa e passa despercebido.
+ *   EMPILHA.     Cada nota são dois osciladores levemente desafinados. Duas
+ *                fontes somam amplitude e batem entre si, o que o ouvido lê
+ *                como "mais alto" bem além do que o volume sozinho dá.
+ *   COMPRIME.    Um compressor segura os picos, e aí dá para subir o volume
+ *                geral sem estourar. É o mesmo truque de rádio: o que faz um
+ *                som parecer alto não é o pico, é a média.
+ *   SOBE.        Sequência ascendente lê como alarme. Descendente soa como
+ *                erro, e alternada vira campainha de loja.
+ *
+ * @param {number} repeticoes quantas vezes o padrão se repete. Quatro é o
+ *                            ajuste que o dono pediu depois de ouvir: dá
+ *                            tempo de registrar sem virar sirene.
  */
-export function tocarSino(repeticoes = 3) {
+export function tocarSino(repeticoes = 4) {
   const ctx = pegarContexto();
   if (!ctx) return;
+
+  // Compressor entre as notas e a saída: deixa levantar o volume sem a
+  // distorção suja que aparece quando a soma dos osciladores estoura em 1.0.
+  const compressor = ctx.createDynamicsCompressor();
+  compressor.threshold.value = -18;
+  compressor.knee.value = 12;
+  compressor.ratio.value = 12;
+  compressor.attack.value = 0.002;
+  compressor.release.value = 0.1;
+  compressor.connect(ctx.destination);
 
   const agora = ctx.currentTime;
 
   for (let volta = 0; volta < repeticoes; volta += 1) {
-    const atraso = volta * 0.75;
+    const atraso = volta * 0.58;
 
     for (const nota of NOTAS) {
-      const osc = ctx.createOscillator();
-      const ganho = ctx.createGain();
+      // Duas fontes por nota, desafinadas em 4 Hz: batem entre si e produzem
+      // aquela pulsação de alarme, além de somar volume.
+      for (const [tipo, desafino] of [['sawtooth', -2], ['square', 2]]) {
+        const osc = ctx.createOscillator();
+        const ganho = ctx.createGain();
 
-      // Onda triangular: mais suave que a quadrada, mais presente que a
-      // senoidal. Precisa cortar o ruído sem ser desagradável a cada pedido.
-      osc.type = 'triangle';
-      osc.frequency.value = nota.hz;
+        osc.type = tipo;
+        osc.frequency.value = nota.hz + desafino;
 
-      const inicio = agora + atraso + nota.inicio;
-      const fim = inicio + nota.duracao;
+        const inicio = agora + atraso + nota.inicio;
+        const fim = inicio + nota.duracao;
 
-      // Envelope com decaimento: começar e parar seco produz um "clique" no
-      // alto-falante que soa como defeito.
-      ganho.gain.setValueAtTime(0, inicio);
-      ganho.gain.linearRampToValueAtTime(0.3, inicio + 0.01);
-      ganho.gain.exponentialRampToValueAtTime(0.001, fim);
+        // Ataque quase instantâneo (5ms): som que sobe devagar é abafado pelo
+        // ruído antes de chegar ao volume que importa.
+        ganho.gain.setValueAtTime(0, inicio);
+        ganho.gain.linearRampToValueAtTime(0.55, inicio + 0.005);
+        ganho.gain.setValueAtTime(0.55, fim - 0.04);
+        ganho.gain.exponentialRampToValueAtTime(0.001, fim);
 
-      osc.connect(ganho);
-      ganho.connect(ctx.destination);
-      osc.start(inicio);
-      osc.stop(fim + 0.02);
+        osc.connect(ganho);
+        ganho.connect(compressor);
+        osc.start(inicio);
+        osc.stop(fim + 0.02);
+      }
     }
   }
+
+  // Desconecta o compressor quando o alarme acaba. Sem isso, cada pedido
+  // deixaria um nó pendurado no grafo de áudio — num turno inteiro isso vira
+  // centenas, e o painel começa a engasgar.
+  const duracaoTotal = repeticoes * 0.58 + 0.6;
+  setTimeout(() => {
+    try {
+      compressor.disconnect();
+    } catch {
+      // Já desconectado. Não há o que fazer nem o que avisar.
+    }
+  }, duracaoTotal * 1000 + 200);
 }
 
 // ---------------------------------------------------------------------------

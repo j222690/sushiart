@@ -15,6 +15,8 @@ import { desligarModoPainel } from '../lib/modoPainel';
 import { useRealtimeOrders } from '../hooks/useRealtimeOrders';
 import { useToast } from '../context/ToastContext';
 import { liberarNoPrimeiroToque, prepararSino, sinoLiberado, sinoLigado, tocarSino } from '../lib/sinoDaCozinha';
+import { impressaoAutomatica, imprimirComanda } from '../lib/comanda';
+import { adminOrders } from '../lib/adminApi';
 
 const NAV = [
   { to: PAINEL, label: 'Visão geral', icon: LayoutDashboard, end: true },
@@ -40,6 +42,7 @@ const NAV = [
  */
 function SinoDePedidoNovo() {
   const toast = useToast();
+  const { restaurant } = useStore();
   const conhecidos = useRef(new Set());
   const [bloqueado, setBloqueado] = useState(false);
 
@@ -65,8 +68,25 @@ function SinoDePedidoNovo() {
       if (conhecidos.current.has(linha.id)) return;
       conhecidos.current.add(linha.id);
 
-      if (sinoLigado()) tocarSino(3);
+      if (sinoLigado()) tocarSino(); // sem numero: usa o alarme cheio
       toast.success(`Pedido novo: ${linha.code}`);
+
+      // Comanda sai sozinha, para ser grampeada no pacote.
+      //
+      // O evento do tempo real traz só a linha do pedido — sem itens, sem
+      // endereço, sem o nome do cliente. Imprimir com o que veio daria uma
+      // comanda sem o que a cozinha precisa, então buscamos o pedido inteiro
+      // antes. É uma consulta a mais por pedido, e vale.
+      if (impressaoAutomatica()) {
+        adminOrders
+          .get(linha.id)
+          .then((completo) => imprimirComanda(completo, restaurant))
+          .catch(() => {
+            // Falhar a impressão não pode esconder o pedido: o sino já tocou e
+            // ele está na tela. O aviso diz o que fazer à mão.
+            toast.error(`Não consegui imprimir a comanda do ${linha.code}. Imprima pelo pedido.`);
+          });
+      }
     },
     [toast]
   );
@@ -80,7 +100,7 @@ function SinoDePedidoNovo() {
       type="button"
       onClick={() => {
         prepararSino();
-        tocarSino(1);
+        tocarSino(2); // duas voltas: confirmacao, nao o alarme inteiro
         setBloqueado(false);
       }}
       className="mb-4 flex w-full items-center gap-3 rounded-card border border-warning/40 bg-warning/10 px-4 py-3 text-left"

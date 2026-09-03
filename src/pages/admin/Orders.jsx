@@ -8,11 +8,15 @@ import { Badge, Button, Card, Sheet, Spinner, Textarea } from '../../components/
 import { adminOrders } from '../../lib/adminApi';
 import { useRealtimeOrders } from '../../hooks/useRealtimeOrders';
 import { useToast } from '../../context/ToastContext';
+import { useStore } from '../../context/StoreContext';
 import { formatBRL, formatDateTime, timeAgo, formatPhone } from '../../lib/format';
 import {
   ORDER_STATUS, KANBAN_COLUMNS, ACTIVE_STATUSES, ON_DELIVERY_KINDS, nextStatusFor, paymentLabel,
 } from '../../lib/constants';
 import { definirSino, prepararSino, sinoLigado, tocarSino } from '../../lib/sinoDaCozinha';
+import {
+  definirImpressaoAutomatica, impressaoAutomatica, imprimirComanda,
+} from '../../lib/comanda';
 
 const METHOD_ICONS = {
   pix: QrCode,
@@ -23,12 +27,14 @@ const METHOD_ICONS = {
 
 export default function AdminOrders() {
   const toast = useToast();
+  const { restaurant } = useStore();
   const [params, setParams] = useSearchParams();
 
   const [orders, setOrders] = useState(null);
   const [detail, setDetail] = useState(null);
   const [busy, setBusy] = useState(false);
   const [soundOn, setSoundOn] = useState(sinoLigado);
+  const [autoPrint, setAutoPrint] = useState(impressaoAutomatica);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
@@ -126,73 +132,8 @@ export default function AdminOrders() {
 
   /** Comanda da cozinha: abre a janela de impressão só com o essencial. */
   function print(order) {
-    const win = window.open('', '_blank', 'width=380,height=640');
-    if (!win) {
-      toast.error('O navegador bloqueou a janela de impressão.');
-      return;
-    }
-
-    const items = order.order_items
-      .map(
-        (item) => `
-        <tr>
-          <td style="vertical-align:top;padding:4px 6px 4px 0;font-weight:700">${item.quantity}x</td>
-          <td style="padding:4px 0">
-            ${escapeHtml(item.product_name)}
-            ${(item.addons ?? []).length ? `<div style="font-size:11px">+ ${escapeHtml(item.addons.map((a) => a.name).join(', '))}</div>` : ''}
-            ${item.notes ? `<div style="font-size:11px;font-style:italic">** ${escapeHtml(item.notes)} **</div>` : ''}
-          </td>
-          <td style="text-align:right;vertical-align:top;padding:4px 0">${formatBRL(item.total_cents)}</td>
-        </tr>`
-      )
-      .join('');
-
-    const address = order.address_snapshot;
-
-    win.document.write(`
-      <!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
-      <title>Comanda ${escapeHtml(order.code)}</title>
-      <style>
-        body{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;margin:12px;color:#000}
-        h1{font-size:16px;margin:0 0 2px} table{width:100%;border-collapse:collapse}
-        hr{border:none;border-top:1px dashed #000;margin:8px 0}
-        .total{font-size:14px;font-weight:700}
-      </style></head><body>
-        <h1>Sushi Art — ${escapeHtml(order.code)}</h1>
-        <div>${formatDateTime(order.created_at)}</div>
-        <div>${order.fulfillment === 'entrega' ? 'ENTREGA' : 'RETIRADA'}</div>
-        <hr>
-        <table>${items}</table>
-        <hr>
-        <div>Subtotal: ${formatBRL(order.subtotal_cents)}</div>
-        ${order.delivery_fee_cents ? `<div>Entrega: ${formatBRL(order.delivery_fee_cents)}</div>` : ''}
-        ${order.discount_cents ? `<div>Desconto: -${formatBRL(order.discount_cents)}</div>` : ''}
-        <div class="total">TOTAL: ${formatBRL(order.total_cents)}</div>
-        <div>Pagamento: ${escapeHtml(paymentLabel(order))}${
-          order.change_for_cents
-            ? ` (troco para ${formatBRL(order.change_for_cents)} = levar ${formatBRL(order.change_for_cents - order.total_cents)})`
-            : ''
-        }</div>
-        ${
-          (order.fee_to_arrange
-            ? '<div style="font-weight:700">** TAXA DE ENTREGA A COMBINAR **</div>'
-            : '') +
-          ON_DELIVERY_KINDS[order.on_delivery_kind]?.machine
-            ? '<div style="font-weight:700">** LEVAR MAQUININHA **</div>'
-            : ''
-        }
-        ${
-          address
-            ? `<hr><div><strong>${escapeHtml(address.street)}, ${escapeHtml(address.number)}</strong></div>
-               <div>${escapeHtml(address.neighborhood)}${address.complement ? ` — ${escapeHtml(address.complement)}` : ''}</div>
-               ${address.reference ? `<div>Ref: ${escapeHtml(address.reference)}</div>` : ''}`
-            : ''
-        }
-        ${order.notes ? `<hr><div>OBS: ${escapeHtml(order.notes)}</div>` : ''}
-        <script>window.onload=function(){window.print()}<\/script>
-      </body></html>
-    `);
-    win.document.close();
+    const r = imprimirComanda(order, restaurant);
+    if (!r.ok) toast.error(r.motivo);
   }
 
   if (orders === null) {
@@ -223,12 +164,34 @@ export default function AdminOrders() {
             // aparelho — sem isso a pessoa só descobre no primeiro pedido.
             if (novo) {
               prepararSino();
-              tocarSino(1);
+              tocarSino(2); // duas voltas: confirmacao, nao o alarme inteiro
             }
           }}
         >
           {soundOn ? <Volume2 size={15} /> : <VolumeX size={15} />}
           {soundOn ? 'Som ligado' : 'Som desligado'}
+        </Button>
+
+        {/* Comanda saindo sozinha a cada pedido, como no iFood.
+            Desligada por padrão: depende de impressora ligada e de o navegador
+            deixar abrir janela. Ligada sem impressora do outro lado, o painel
+            passaria o turno abrindo janelas para nada. */}
+        <Button
+          variant={autoPrint ? 'secondary' : 'ghost'}
+          size="sm"
+          onClick={() => {
+            const novo = !autoPrint;
+            setAutoPrint(novo);
+            definirImpressaoAutomatica(novo);
+            toast.info(
+              novo
+                ? 'A comanda vai sair sozinha a cada pedido novo.'
+                : 'Impressão automática desligada.'
+            );
+          }}
+        >
+          <Printer size={15} />
+          {autoPrint ? 'Imprime sozinho' : 'Imprimir manual'}
         </Button>
       </header>
 
@@ -556,11 +519,3 @@ export default function AdminOrders() {
 }
 
 /** Escapa o que vai para a janela de impressão (nome de produto, observação). */
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
