@@ -248,6 +248,12 @@ export default function Settings() {
             onChange={(v) => setRestaurant((c) => ({ ...c, pickup_enabled: v }))}
             label="Retirada no local disponível"
           />
+          <Switch
+            checked={Boolean(restaurant.sakura_ativa)}
+            onChange={(v) => setRestaurant((c) => ({ ...c, sakura_ativa: v }))}
+            label="Pétalas de sakura no app"
+            description="Ligue numa semana de promoção e desligue depois. O ano todo, vira enfeite que ninguém enxerga e ainda gasta bateria"
+          />
         </div>
 
         <Button className="mt-4" loading={saving} onClick={saveRestaurant}>

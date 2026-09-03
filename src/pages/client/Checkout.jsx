@@ -123,11 +123,24 @@ export default function Checkout() {
       : loyalty.reward_cents ?? 0;
   }, [redeemLoyalty, loyalty, points, subtotal]);
 
-  const couponDiscount = coupon?.valid ? coupon.discount_cents : 0;
-  const discount = Math.min(couponDiscount + loyaltyDiscount, subtotal + deliveryFee);
-  const total = subtotal + deliveryFee - discount;
-
   const methodConfig = methods.find((m) => m.method === method);
+
+  const couponDiscount = coupon?.valid ? coupon.discount_cents : 0;
+
+  // Desconto por escolher a forma de pagamento (Pix costuma ter). Espelha
+  // exatamente o que `create_order` faz no servidor — inclusive incidir só
+  // sobre o subtotal e entrar antes do teto. Se as duas contas divergirem, o
+  // cliente vê um total no resumo e é cobrado outro, que é o pior tipo de bug
+  // de checkout: só aparece depois do dinheiro sair.
+  const paymentDiscount = Math.floor(
+    (subtotal * Number(methodConfig?.discount_percent ?? 0)) / 100
+  );
+
+  const discount = Math.min(
+    couponDiscount + loyaltyDiscount + paymentDiscount,
+    subtotal + deliveryFee
+  );
+  const total = subtotal + deliveryFee - discount;
 
   // No checkout hospedado da InfinitePay quem escolhe o parcelamento é o
   // cliente, na tela deles. Mostrar as parcelas aqui seria prometer uma escolha
@@ -399,7 +412,18 @@ export default function Checkout() {
               >
                 <Icon size={19} className={active ? 'text-vinho-200' : 'text-cream-muted'} />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-cream">{option.label}</span>
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-sm font-medium text-cream">{option.label}</span>
+
+                    {/* O Pix custa 0,99% e o débito 3,99%. Anunciar o desconto
+                        aqui, na hora da escolha, é o que move o cliente para a
+                        forma que sangra menos — dizer depois não move nada. */}
+                    {Number(option.discount_percent) > 0 && (
+                      <span className="rounded-md bg-success/15 px-1.5 py-0.5 text-[11px] font-bold leading-none text-success">
+                        {Number(option.discount_percent)}% OFF
+                      </span>
+                    )}
+                  </span>
                   {option.description && (
                     <span className="block text-xs text-cream-muted">{option.description}</span>
                   )}
@@ -564,6 +588,13 @@ export default function Checkout() {
             <div className="flex justify-between">
               <dt className="text-cream-muted">Pontos de fidelidade</dt>
               <dd className="text-success">− {formatBRL(loyaltyDiscount)}</dd>
+            </div>
+          )}
+
+          {paymentDiscount > 0 && (
+            <div className="flex justify-between">
+              <dt className="text-cream-muted">Desconto no {methodConfig.label}</dt>
+              <dd className="text-success">− {formatBRL(paymentDiscount)}</dd>
             </div>
           )}
 

@@ -67,6 +67,95 @@
     scrollbar-width: none;
   }
 
+  /* -------------------------------------------------------------------
+     Motivos japoneses
+     ------------------------------------------------------------------- */
+
+  /* Papel washi. Vai no card grande sem foto: as fibras dão o que olhar
+     onde antes tinha um retângulo de cor chapada.
+
+     `.washi` para superfície clara e `.washi-claro` para superfície escura —
+     fibra escura sobre o vinho do banner não aparece. */
+  .washi {
+    @apply bg-washi;
+  }
+  .washi-claro {
+    @apply bg-washi-claro;
+  }
+
+  /* Ondas seigaiha (青海波). A cor sai do `currentColor` do elemento, então
+     `text-aizome-200` pinta a onda — o mesmo bloco serve em fundo claro e
+     em fundo vinho sem precisar de uma segunda classe. */
+  .seigaiha {
+    @apply bg-seigaiha;
+    background-size: 34px 17px;
+  }
+
+  /* Emenda kintsugi: a linha que separa os produtos vira um veio de ouro
+     interrompido, como a cerâmica remendada. Os cortes são fixos e não
+     regulares de propósito — emenda de verdade não é simétrica.
+
+     Vai no PAI e alcança os filhos, e não como classe em cada item, porque a
+     lista é montada por `map` em três telas diferentes; marcar item por item
+     daria três lugares para esquecer. Em `::after`, então não custa nenhum
+     elemento a mais no DOM de uma lista de 53 produtos. */
+  .kintsugi > * {
+    position: relative;
+  }
+  .kintsugi > *::after {
+    content: '';
+    @apply pointer-events-none absolute inset-x-4 bottom-0 h-px;
+    background: linear-gradient(
+      90deg,
+      theme('colors.ember') 0 19%,
+      transparent 19% 23%,
+      theme('colors.ember') 23% 58%,
+      transparent 58% 63%,
+      theme('colors.ember') 63% 88%,
+      transparent 88% 91%,
+      theme('colors.ember') 91% 100%
+    );
+    opacity: 0.34;
+  }
+  /* O último da lista não leva emenda: costura sobrando na borda do bloco
+     lê como erro de renderização, não como acabamento. */
+  .kintsugi > *:last-child::after {
+    display: none;
+  }
+  /* Em colunas cada card tem a própria borda e não existe "emenda entre dois
+     itens" — a costura ali sobraria na beirada. */
+  @media (min-width: 768px) {
+    .kintsugi > *::after {
+      display: none;
+    }
+  }
+
+  /* Escrita vertical (縦書き). Só para palavra curta — em português passa
+     de quatro ou cinco letras e a coluna fica alta demais para ler. */
+  .tategaki {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 0.14em;
+  }
+}
+
+/* -------------------------------------------------------------------
+   Quem pediu menos movimento no sistema recebe o app parado. Vale para
+   tudo que entrou com os motivos: pétala, balanço do noren, carimbo.
+   ------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+
   /* Skeleton de carregamento com brilho */
   .skeleton {
     @apply relative overflow-hidden bg-ink-300;

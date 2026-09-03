@@ -47,7 +47,13 @@ export default function RouletteAdmin() {
       setConfig(c);
       setLoyalty({
         ...l,
+        // Os campos de dinheiro vivem no formulário como texto em reais e no
+        // banco como centavos; a conversão acontece na entrada e na saída.
         reward_cents_input: centsToInput(l.reward_cents),
+        stamp_min_input: centsToInput(l.stamp_min_cents),
+        stamp_reward_input: centsToInput(l.stamp_reward_cents),
+        referral_referrer_input: centsToInput(l.referral_referrer_cents),
+        referral_referred_input: centsToInput(l.referral_referred_cents),
       });
     } catch (error) {
       toast.error(error.message);
@@ -140,6 +146,31 @@ export default function RouletteAdmin() {
         reward_cents:
           loyalty.reward_kind === 'fixo' ? parseBRLToCents(loyalty.reward_cents_input) || null : null,
         expire_days: loyalty.expire_days ? Number(loyalty.expire_days) : null,
+
+        // Cartela
+        stamp_active: Boolean(loyalty.stamp_active),
+        stamps_needed: Number(loyalty.stamps_needed) || 10,
+        stamp_min_cents: parseBRLToCents(loyalty.stamp_min_input) || 0,
+        stamp_reward_kind: loyalty.stamp_reward_kind || 'percentual',
+        stamp_reward_percent:
+          loyalty.stamp_reward_kind === 'percentual'
+            ? Number(loyalty.stamp_reward_percent) || null
+            : null,
+        stamp_reward_cents:
+          loyalty.stamp_reward_kind === 'fixo'
+            ? parseBRLToCents(loyalty.stamp_reward_input) || null
+            : null,
+
+        // Cashback
+        cashback_percent: Number(loyalty.cashback_percent) || 0,
+        cashback_expire_days: loyalty.cashback_expire_days
+          ? Number(loyalty.cashback_expire_days)
+          : null,
+
+        // Indicação
+        referral_active: Boolean(loyalty.referral_active),
+        referral_referrer_cents: parseBRLToCents(loyalty.referral_referrer_input) || 0,
+        referral_referred_cents: parseBRLToCents(loyalty.referral_referred_input) || 0,
       });
       toast.success('Programa de fidelidade salvo.');
       await load();
@@ -363,7 +394,146 @@ export default function RouletteAdmin() {
           />
         </div>
 
-        <Button className="mt-4" loading={saving} onClick={saveLoyalty}>
+        {/* ------------------------------------------------------------- */}
+        {/* Cartela de carimbos                                            */}
+        {/* ------------------------------------------------------------- */}
+        <div className="mt-6 border-t border-line pt-5">
+          <h3 className="mb-3 font-brand text-base text-cream">Cartela de carimbos</h3>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="md:col-span-2 xl:col-span-4">
+              <Switch
+                checked={loyalty.stamp_active}
+                onChange={(v) => setLoyalty((c) => ({ ...c, stamp_active: v }))}
+                label="Cartela ativa"
+                description="Compre N, ganhe 1. Funciona junto com os pontos — pontos premiam quem gasta muito, carimbo premia quem volta sempre"
+              />
+            </div>
+
+            <Input
+              label="Pedidos para fechar a cartela"
+              type="number"
+              min={2}
+              max={50}
+              value={loyalty.stamps_needed ?? 10}
+              onChange={(e) => setLoyalty((c) => ({ ...c, stamps_needed: e.target.value }))}
+            />
+
+            <Input
+              label="Valor mínimo por pedido"
+              inputMode="decimal"
+              placeholder="R$ 0,00"
+              hint="Sem isso, dez refrigerantes viram um combinado de graça."
+              value={loyalty.stamp_min_input ?? ''}
+              onChange={(e) => setLoyalty((c) => ({ ...c, stamp_min_input: e.target.value }))}
+            />
+
+            <Select
+              label="Prêmio da cartela"
+              value={loyalty.stamp_reward_kind ?? 'percentual'}
+              onChange={(e) => setLoyalty((c) => ({ ...c, stamp_reward_kind: e.target.value }))}
+            >
+              <option value="percentual">Desconto percentual</option>
+              <option value="fixo">Desconto em reais</option>
+              <option value="frete_gratis">Frete grátis</option>
+            </Select>
+
+            {loyalty.stamp_reward_kind === 'percentual' && (
+              <Input
+                label="Percentual do prêmio (%)"
+                type="number"
+                min={1}
+                max={100}
+                value={loyalty.stamp_reward_percent ?? ''}
+                onChange={(e) =>
+                  setLoyalty((c) => ({ ...c, stamp_reward_percent: e.target.value }))
+                }
+              />
+            )}
+
+            {loyalty.stamp_reward_kind === 'fixo' && (
+              <Input
+                label="Valor do prêmio"
+                inputMode="decimal"
+                value={loyalty.stamp_reward_input ?? ''}
+                onChange={(e) => setLoyalty((c) => ({ ...c, stamp_reward_input: e.target.value }))}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* ------------------------------------------------------------- */}
+        {/* Cashback                                                       */}
+        {/* ------------------------------------------------------------- */}
+        <div className="mt-6 border-t border-line pt-5">
+          <h3 className="mb-1 font-brand text-base text-cream">Cashback em crédito</h3>
+          <p className="mb-3 text-xs text-cream-muted">
+            Devolve uma parte do pedido como saldo no app. Prende melhor que desconto à vista: o
+            dinheiro só existe aqui dentro e tem prazo, então a pessoa volta para não perder.
+          </p>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Input
+              label="Cashback (%)"
+              type="number"
+              min={0}
+              max={30}
+              step="0.5"
+              hint="0 desliga o cashback."
+              value={loyalty.cashback_percent ?? 0}
+              onChange={(e) => setLoyalty((c) => ({ ...c, cashback_percent: e.target.value }))}
+            />
+
+            <Input
+              label="Crédito expira em (dias)"
+              type="number"
+              min={1}
+              placeholder="sem expiração"
+              hint="30 dias é o que costuma trazer a pessoa de volta."
+              value={loyalty.cashback_expire_days ?? ''}
+              onChange={(e) => setLoyalty((c) => ({ ...c, cashback_expire_days: e.target.value }))}
+            />
+          </div>
+        </div>
+
+        {/* ------------------------------------------------------------- */}
+        {/* Indicação                                                      */}
+        {/* ------------------------------------------------------------- */}
+        <div className="mt-6 border-t border-line pt-5">
+          <h3 className="mb-3 font-brand text-base text-cream">Indicação premiada</h3>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="md:col-span-2 xl:col-span-4">
+              <Switch
+                checked={loyalty.referral_active}
+                onChange={(v) => setLoyalty((c) => ({ ...c, referral_active: v }))}
+                label="Indicação ativa"
+                description="O crédito só sai quando o primeiro pedido do indicado for entregue — pagar no cadastro é convite para conta falsa"
+              />
+            </div>
+
+            <Input
+              label="Crédito para quem indica"
+              inputMode="decimal"
+              value={loyalty.referral_referrer_input ?? ''}
+              onChange={(e) =>
+                setLoyalty((c) => ({ ...c, referral_referrer_input: e.target.value }))
+              }
+            />
+
+            <Input
+              label="Crédito para quem é indicado"
+              inputMode="decimal"
+              hint="Os dois lados ganharem é o que faz funcionar."
+              value={loyalty.referral_referred_input ?? ''}
+              onChange={(e) =>
+                setLoyalty((c) => ({ ...c, referral_referred_input: e.target.value }))
+              }
+            />
+          </div>
+        </div>
+
+        <Button className="mt-5" loading={saving} onClick={saveLoyalty}>
           Salvar fidelidade
         </Button>
       </Card>

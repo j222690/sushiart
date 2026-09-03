@@ -8,13 +8,18 @@ import OfferCard from '../../components/OfferCard';
 import SugestoesInfinitas from '../../components/SugestoesInfinitas';
 import PopupOfertas from '../../components/PopupOfertas';
 import ProductImage from '../../components/ProductImage';
+import Noren from '../../components/Noren';
+import Lanternas from '../../components/Lanternas';
+import Sakura from '../../components/Sakura';
+import PedirDeNovo from '../../components/PedirDeNovo';
 import { Badge, Button, Card, Skeleton } from '../../components/ui';
 import { home, menu, promo } from '../../lib/api';
 import { useMenu, useFavorites } from '../../hooks/useMenu';
 import { useStore } from '../../context/StoreContext';
 import { useAuth } from '../../context/AuthContext';
 import { formatBRL } from '../../lib/format';
-import { emojiCategoria, fundoCategoria } from '../../lib/emojiCategoria';
+import { fundoCategoria } from '../../lib/emojiCategoria';
+import { iconeCategoria } from '../../lib/iconesCategoria';
 
 /** Faixa horizontal reutilizada nos vários carrosséis da home. */
 function Rail({ title, subtitle, icon: Icon, action, children }) {
@@ -100,16 +105,32 @@ export default function Home() {
           fazendo alguma coisa, e interromper ali custa pedido. */}
       <PopupOfertas />
 
+      {/* Pétalas só quando o painel liga — florada, Ano-Novo, semana de
+          promoção. Ver o comentário do componente. */}
+      <Sakura ativa={Boolean(restaurant?.sakura_ativa)} />
+
+      {/* Noren: cortina pendurada quer dizer casa aberta. Lê o mesmo `isOpen`
+          do selo logo abaixo, então nunca discordam. */}
+      <Noren isOpen={isOpen} />
+
       {/* Saudação + tempo de entrega */}
-      <section className="bg-ember-glow px-4 pb-2 pt-4">
-        <p className="font-brand text-xl text-cream">
+      <section className="relative bg-ember-glow px-4 pb-2 pt-4">
+        <Lanternas />
+
+        <p className="relative font-brand text-xl text-cream">
           {firstName ? `Olá, ${firstName}` : 'Bem-vindo ao Sushi Art'}
         </p>
-        <p className="mt-0.5 font-script text-2xl text-vinho-200">
+        {/* いらっしゃいませ — o "bem-vindo" que se grita quando alguém entra
+            no restaurante. Com a tradução do lado, para não virar enfeite
+            ilegível para quem não conhece. */}
+        <p className="relative mt-1 font-brand text-[11px] tracking-[0.18em] text-aizome-500">
+          いらっしゃいませ <span className="text-cream-faint">· bem-vindo</span>
+        </p>
+        <p className="relative mt-0.5 font-script text-2xl text-vinho-200">
           {restaurant?.tagline || 'Amor em forma de sushi'}
         </p>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="relative mt-3 flex flex-wrap items-center gap-2">
           <Badge tone={isOpen ? 'success' : 'danger'}>{isOpen ? 'Aberto agora' : 'Fechado'}</Badge>
           {restaurant && (
             <>
@@ -135,6 +156,10 @@ export default function Home() {
               onClick={() => handleBanner(banner)}
               className="relative flex h-36 w-[85%] shrink-0 flex-col justify-end overflow-hidden rounded-card bg-vinho-gradient p-5 text-left shadow-card transition-transform active:scale-[0.99]"
             >
+              {/* Fibras de papel washi por cima do vinho: é o que resolve o
+                  card grande sem foto sem precisar de imagem nenhuma. Versão
+                  clara, porque sobre o vinho a fibra escura não aparece. */}
+              <span aria-hidden="true" className="washi-claro pointer-events-none absolute inset-0" />
               {/* Sem foto de propósito. As fotos do cardápio são quadradas e de
                   400 px; esticadas numa faixa larga elas cortam o prato pela
                   metade e ficam moles. Faixa da marca com tipografia forte lê
@@ -234,6 +259,11 @@ export default function Home() {
         </button>
       )}
 
+      {/* Antes das ofertas: quem já pediu costuma vir para repetir, e fazer
+          essa pessoa rolar a home inteira até achar os mesmos itens é o
+          atrito que o botão existe para remover. */}
+      <PedirDeNovo userId={user?.id} produtos={products} />
+
       {/* Ofertas */}
       {offers.length > 0 && (
         <Rail
@@ -295,17 +325,20 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            {byCategory.map((category, i) => (
+            {byCategory.map((category, i) => {
+              const Icone = iconeCategoria(category);
+
+              return (
               <button
                 key={category.id}
                 type="button"
                 onClick={() => navigate(`/cardapio?categoria=${category.slug}`)}
                 // Sem foto, como as faixas do topo. A foto de um prato recortada
                 // num retângulo de 96 px não mostra prato nenhum — vira mancha
-                // colorida. Emoji grande diz a categoria de longe, e o fundo em
+                // colorida. Figura grande diz a categoria de longe, e o fundo em
                 // cor cheia dá o destaque que a foto não estava dando.
                 // Coluna com o texto empurrado para baixo, em vez do texto solto
-                // em `absolute bottom-0`: naquele arranjo o emoji ficava no
+                // em `absolute bottom-0`: naquele arranjo a figura ficava no
                 // fluxo e o título fora dele, então num card de 96 px os dois se
                 // encontravam e o nome passava por cima da figura. Em coluna
                 // eles não têm como se sobrepor, em qualquer altura de card.
@@ -315,16 +348,16 @@ export default function Home() {
                   fundoCategoria(i)
                 )}
               >
+                {/* Ondas seigaiha por cima do gradiente: o card deixa de ser
+                    um retângulo de cor chapada e ganha tecido. */}
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-3 -top-3 select-none text-[54px] leading-none opacity-20"
-                >
-                  {emojiCategoria(category)}
-                </span>
+                  className="seigaiha pointer-events-none absolute inset-0 text-white opacity-[0.09]"
+                />
 
-                <span aria-hidden="true" className="relative text-xl leading-none">
-                  {emojiCategoria(category)}
-                </span>
+                <Icone className="pointer-events-none absolute -right-3 -top-2 h-[62px] w-[62px] text-white opacity-[0.18]" />
+
+                <Icone className="relative h-5 w-5 text-white" />
 
                 <div className="relative mt-auto min-w-0">
                   <p className="truncate font-brand text-sm leading-tight text-white">
@@ -336,7 +369,8 @@ export default function Home() {
                   </p>
                 </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

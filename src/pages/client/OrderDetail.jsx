@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, MapPin, Banknote, QrCode, CreditCard, MessageCircle, Store } from 'lucide-react';
 import OrderStatusTracker from '../../components/OrderStatusTracker';
+import Hanko from '../../components/Hanko';
+import AvaliarPedido from '../../components/AvaliarPedido';
 import { Badge, Button, Card, Spinner } from '../../components/ui';
 import { orders as ordersApi } from '../../lib/api';
 import { useRealtimeOrders } from '../../hooks/useRealtimeOrders';
@@ -9,6 +11,21 @@ import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { formatBRL, formatDateTime } from '../../lib/format';
 import { paymentLabel } from '../../lib/constants';
+
+/**
+ * Status em que o pedido já está firmado e o carimbo faz sentido.
+ *
+ * Fica de fora `aguardando_pagamento` (nada foi firmado ainda) e `cancelado`
+ * — carimbar um pedido cancelado seria o app comemorando o que deu errado.
+ */
+const PEDIDO_FIRMADO = new Set([
+  'pago',
+  'confirmado_entrega',
+  'em_preparo',
+  'saiu_para_entrega',
+  'pronto_para_retirada',
+  'entregue',
+]);
 
 const METHOD_ICONS = {
   pix: QrCode,
@@ -96,8 +113,28 @@ export default function OrderDetail() {
       </header>
 
       {/* Acompanhamento */}
-      <Card className="mb-5 p-4">
+      <Card className="relative mb-5 overflow-hidden p-4">
+        {/* Carimbo hanko no pedido confirmado: bate na tela como carimbo em
+            papel. É o momento em que o cliente quer sentir que deu certo.
+            Fica atrás do texto, na diagonal do canto, como marca d'água de
+            comprovante — não pode disputar leitura com a trilha do pedido. */}
+        {PEDIDO_FIRMADO.has(order.status) && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-2 top-1 opacity-[0.13]"
+          >
+            <Hanko texto={order.status === 'entregue' ? '完' : '認'} size={92} animar />
+          </div>
+        )}
+
         <OrderStatusTracker order={order} history={order.order_status_history ?? []} />
+
+        {/* ごちそうさま — o que se diz depois de comer, agradecendo a refeição. */}
+        {order.status === 'entregue' && (
+          <p className="mt-4 border-t border-line pt-3 text-center font-brand text-[11px] tracking-[0.16em] text-aizome-400">
+            ごちそうさまでした <span className="text-cream-faint">· obrigado pela refeição</span>
+          </p>
+        )}
       </Card>
 
       {order.status === 'aguardando_pagamento' && (
@@ -105,6 +142,11 @@ export default function OrderDetail() {
           Finalizar pagamento
         </Button>
       )}
+
+      {/* Logo depois da trilha, enquanto a lembrança da refeição está fresca —
+          descer até o fim da página para achar a avaliação é o que faz
+          ninguém avaliar. */}
+      <AvaliarPedido order={order} customerId={order.customer_id} />
 
       {/* Itens */}
       <Card className="mb-4 p-4">

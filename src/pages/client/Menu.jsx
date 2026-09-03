@@ -10,6 +10,7 @@ import { useMenu, useFavorites } from '../../hooks/useMenu';
 import { useAuth } from '../../context/AuthContext';
 import { menu as menuApi } from '../../lib/api';
 import { LISTA_PRODUTOS } from '../../lib/constants';
+import { kanjiCategoria } from '../../lib/iconesCategoria';
 
 export default function Menu() {
   const [params, setParams] = useSearchParams();
@@ -125,7 +126,22 @@ export default function Menu() {
           }}
           className="scroll-mt-28 px-4 pt-6"
         >
-          <h2 className="mb-3 font-brand text-xl text-cream">{category.name}</h2>
+          {/* Cabeçalho no formato de cardápio japonês: a coluna de kanji na
+              vertical (縦書き) e o nome em português do lado, na horizontal.
+              A coluna carrega dois caracteres — em português "Combinados"
+              viraria uma torre ilegível de dez letras. */}
+          <div className="mb-3 flex items-stretch gap-2.5">
+            {kanjiCategoria(category) && (
+              <span
+                aria-hidden="true"
+                className="tategaki shrink-0 border-r-2 border-vinho pr-1.5 font-brand text-sm leading-none text-aizome"
+              >
+                {kanjiCategoria(category)}
+              </span>
+            )}
+            <h2 className="self-end font-brand text-xl text-cream">{category.name}</h2>
+          </div>
+
           <div className={LISTA_PRODUTOS}>
             {category.products.map((product) => (
               <ProductCard

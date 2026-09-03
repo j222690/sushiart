@@ -193,6 +193,31 @@ export default function Payments() {
                   }}
                 />
 
+                {/* Desconto por escolher esta forma.
+                    O Pix custa 0,99% e o débito 3,99%: um desconto pequeno no
+                    Pix ainda deixa o restaurante na frente e treina o cliente
+                    a escolher a forma que sangra menos. Aparece como selo no
+                    checkout e sai do total, calculado no servidor. */}
+                <Input
+                  label="Desconto para o cliente (%)"
+                  type="number"
+                  min={0}
+                  max={20}
+                  step="0.5"
+                  defaultValue={Number(row.discount_percent ?? 0)}
+                  hint={
+                    row.method === 'pix'
+                      ? 'O Pix é a forma mais barata para a casa — vale incentivar.'
+                      : '0 = sem desconto.'
+                  }
+                  onBlur={(e) => {
+                    const valor = Math.min(20, Math.max(0, Number(e.target.value) || 0));
+                    if (valor !== Number(row.discount_percent ?? 0)) {
+                      save(row.method, { discount_percent: valor });
+                    }
+                  }}
+                />
+
                 {row.method === 'cartao_credito' && (
                   <>
                     <Input

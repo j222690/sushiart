@@ -369,6 +369,108 @@ export const promo = {
   async redeemLoyalty() {
     return unwrap(await supabase.rpc('redeem_loyalty_coupon'), 'Não foi possível resgatar.');
   },
+
+  // -------------------------------------------------------------------------
+  // Cartela de carimbos, crédito e nível
+  //
+  // Os três saem de função no servidor, não de conta feita no app: quem soma
+  // dinheiro é o Postgres. Aqui só se lê o resultado.
+  // -------------------------------------------------------------------------
+
+  /** Quantos carimbos há na cartela aberta. */
+  async stampCount() {
+    return unwrap(await supabase.rpc('stamp_count'), 'Não foi possível carregar sua cartela.');
+  },
+
+  /** Saldo de crédito, já sem o que expirou. */
+  async creditBalance() {
+    return unwrap(await supabase.rpc('credit_balance'), 'Não foi possível carregar seu crédito.');
+  },
+
+  async creditHistory(userId) {
+    return unwrap(
+      await supabase
+        .from('customer_credits')
+        .select('*')
+        .eq('customer_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      'Não foi possível carregar seu extrato de crédito.'
+    );
+  },
+
+  /** Nível atual do cliente, pelo gasto dos últimos 180 dias. */
+  async tier() {
+    const { data, error } = await supabase.rpc('customer_tier');
+    if (error) throw new Error(friendlyError(error, 'Não foi possível carregar seu nível.'));
+    // A função devolve uma linha da tabela; o PostgREST entrega como array
+    // quando o retorno é um tipo composto.
+    return Array.isArray(data) ? data[0] : data;
+  },
+
+  /** Todos os níveis, para mostrar o quanto falta para o próximo. */
+  async tiers() {
+    return unwrap(
+      await supabase.from('loyalty_tiers').select('*').order('sort_order'),
+      'Não foi possível carregar os níveis.'
+    );
+  },
+
+  // -------------------------------------------------------------------------
+  // Indicação
+  // -------------------------------------------------------------------------
+
+  /** Registra o código que a pessoa digitou. Devolve `false` se não valeu. */
+  async useReferralCode(code) {
+    return unwrap(
+      await supabase.rpc('usar_codigo_indicacao', { p_codigo: code }),
+      'Não foi possível aplicar o código.'
+    );
+  },
+
+  /** Quantas indicações já renderam prêmio. */
+  async myReferrals(userId) {
+    return unwrap(
+      await supabase
+        .from('referrals')
+        .select('id, qualified_at, created_at')
+        .eq('referrer_id', userId)
+        .order('created_at', { ascending: false }),
+      'Não foi possível carregar suas indicações.'
+    );
+  },
+};
+
+// ===========================================================================
+// AVALIAÇÃO DO PEDIDO
+// ===========================================================================
+export const reviews = {
+  /** A avaliação deste pedido, ou `null` se ainda não avaliou. */
+  async forOrder(orderId) {
+    const { data, error } = await supabase
+      .from('order_reviews')
+      .select('*')
+      .eq('order_id', orderId)
+      .maybeSingle();
+    if (error) throw new Error(friendlyError(error, 'Não foi possível carregar a avaliação.'));
+    return data;
+  },
+
+  async create({ orderId, customerId, rating, comment }) {
+    return unwrap(
+      await supabase
+        .from('order_reviews')
+        .insert({
+          order_id: orderId,
+          customer_id: customerId,
+          rating,
+          comment: comment?.trim() || null,
+        })
+        .select()
+        .single(),
+      'Não foi possível enviar sua avaliação.'
+    );
+  },
 };
 
 // ===========================================================================

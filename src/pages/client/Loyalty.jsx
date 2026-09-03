@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Gift, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowLeft, Sparkles, Gift, TrendingUp, TrendingDown, Wallet, Award } from 'lucide-react';
 import { Button, Card, EmptyState, Skeleton } from '../../components/ui';
+import CartelaCarimbos from '../../components/CartelaCarimbos';
+import Indicacao from '../../components/Indicacao';
 import { promo } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -10,18 +12,31 @@ import { formatBRL, formatDateTime } from '../../lib/format';
 export default function Loyalty() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { user } = useAuth();
+  const { user, customer } = useAuth();
 
   const [balance, setBalance] = useState(null);
   const [config, setConfig] = useState(null);
   const [history, setHistory] = useState(null);
   const [redeeming, setRedeeming] = useState(false);
 
+  // Cartela, crédito, nível e indicações. Todos com `catch` que zera em vez de
+  // derrubar a tela: o programa que estiver desligado no painel simplesmente
+  // não aparece, e uma consulta que falhou não pode esconder o saldo de
+  // pontos, que é o motivo de a pessoa ter aberto esta tela.
+  const [carimbos, setCarimbos] = useState(0);
+  const [credito, setCredito] = useState(0);
+  const [nivel, setNivel] = useState(null);
+  const [indicacoes, setIndicacoes] = useState([]);
+
   const load = useCallback(() => {
     if (!user) return;
     promo.loyaltyBalance().then(setBalance).catch(() => setBalance(0));
     promo.loyaltyConfig().then(setConfig).catch(() => setConfig(null));
     promo.loyaltyHistory(user.id).then(setHistory).catch(() => setHistory([]));
+    promo.stampCount().then(setCarimbos).catch(() => setCarimbos(0));
+    promo.creditBalance().then(setCredito).catch(() => setCredito(0));
+    promo.tier().then(setNivel).catch(() => setNivel(null));
+    promo.myReferrals(user.id).then(setIndicacoes).catch(() => setIndicacoes([]));
   }, [user]);
 
   useEffect(() => {
@@ -108,6 +123,42 @@ export default function Loyalty() {
           {missing > 0 ? `Resgatar com ${goal} pontos` : 'Resgatar recompensa'}
         </Button>
       </Card>
+
+      {/* Crédito e nível lado a lado: são dois números curtos, e empilhados
+          empurrariam a cartela para fora da primeira tela. */}
+      {(credito > 0 || nivel) && (
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          {credito > 0 && (
+            <Card className="p-4">
+              <Wallet size={17} className="text-success" />
+              <p className="mt-1.5 text-xl font-extrabold tabular-nums text-cream">
+                {formatBRL(credito)}
+              </p>
+              <p className="text-[11px] uppercase tracking-wider text-cream-muted">
+                em crédito
+              </p>
+            </Card>
+          )}
+
+          {nivel && (
+            <Card className="p-4">
+              <Award size={17} className="text-ember" />
+              <p className="mt-1.5 truncate text-xl font-extrabold text-cream">{nivel.name}</p>
+              <p className="truncate text-[11px] text-cream-muted">
+                {nivel.perk || 'Seu nível atual'}
+              </p>
+            </Card>
+          )}
+        </div>
+      )}
+
+      <CartelaCarimbos carimbos={carimbos} config={config} />
+
+      <Indicacao
+        codigo={customer?.referral_code}
+        indicacoes={indicacoes}
+        config={config}
+      />
 
       {config.expire_days && (
         <p className="mt-3 text-center text-[11px] text-cream-faint">

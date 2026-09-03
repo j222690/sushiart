@@ -281,8 +281,41 @@ export function EmptyState({ icon: Icon, title, description, action }) {
   );
 }
 
-export function Spinner({ className }) {
-  return <Loader2 className={clsx('animate-spin text-vinho-300', className)} size={22} />;
+/**
+ * Espera do app: um par de hashi (箸) girando, no lugar da rodinha genérica.
+ *
+ * Aparece em toda espera — cardápio carregando, pedido salvando, busca — então
+ * é a peça de identidade mais repetida do app, dezenas de vezes por pedido,
+ * sem ocupar um pixel a mais que o spinner que substituiu.
+ *
+ * Os dois palitos giram juntos, abertos num V pequeno, presos pela ponta de
+ * baixo. Girar cada um por conta faria eles se cruzarem em ângulos que hashi
+ * nenhum faz.
+ */
+export function Spinner({ className, size = 22 }) {
+  return (
+    <span
+      role="status"
+      aria-label="Carregando"
+      style={{ width: size, height: size }}
+      className={clsx('relative inline-block shrink-0', className)}
+    >
+      <span className="animate-girar-hashi absolute inset-0 block">
+        {[-13, 6].map((graus) => (
+          <span
+            key={graus}
+            style={{ transform: `rotate(${graus}deg)` }}
+            // A origem embaixo à esquerda é o ponto onde a mão segura: é ele
+            // que faz o par abrir em leque em vez de girar como uma hélice.
+            className={clsx(
+              'absolute left-1/2 top-1/2 block h-[9%] w-[86%] origin-[10%_50%] -translate-x-1/2 -translate-y-1/2',
+              'rounded-full bg-gradient-to-r from-ember to-vinho'
+            )}
+          />
+        ))}
+      </span>
+    </span>
+  );
 }
 
 // ---------------------------------------------------------------------------

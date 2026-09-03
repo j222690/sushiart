@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, Trash2, Pencil, Bike, Store } from 'lucide-react';
 import clsx from 'clsx';
 import ProductImage from '../../components/ProductImage';
+import ProximaVantagem from '../../components/ProximaVantagem';
 import { Button, Card, EmptyState, QuantityStepper, Sheet, Textarea } from '../../components/ui';
 import { useCart } from '../../store/cart';
 import { useStore } from '../../context/StoreContext';
@@ -148,6 +149,11 @@ export default function Cart() {
         <p className="mt-2 text-xs text-cream-faint">
           Taxa de entrega, cupom e desconto entram na próxima etapa.
         </p>
+
+        {/* O quanto falta para a próxima vantagem. Fica dentro do resumo, ao
+            lado do subtotal, porque é ali que a pessoa está olhando quando
+            decide se põe mais um item. */}
+        <ProximaVantagem subtotalCents={subtotal} />
       </Card>
 
       {belowMinimum && (
