@@ -35,3 +35,12 @@ verify_jwt = false
 
 [functions.send-push]
 verify_jwt = false
+
+# A conexão OAuth do Mercado Pago tem os dois casos na mesma função, e por isso
+# fica sem JWT: quem chega em `/callback` é o navegador do dono do restaurante
+# redirecionado pelo Mercado Pago, e ele não carrega JWT nenhum do nosso
+# projeto. O `/start`, que é o caminho perigoso — devolve um link que pode
+# redirecionar o dinheiro —, confere `is_admin()` por conta própria; o
+# `/callback` confere o `state` de uso único que o `/start` gravou.
+[functions.mercadopago-oauth]
+verify_jwt = false

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { QrCode, CreditCard, Banknote, ShieldCheck, AlertTriangle, Info } from 'lucide-react';
 import clsx from 'clsx';
 import { Badge, Button, Card, Input, Select, Skeleton, Switch } from '../../components/ui';
+import ContaMercadoPago from '../../components/admin/ContaMercadoPago';
 import { adminSettings } from '../../lib/adminApi';
 import { useToast } from '../../context/ToastContext';
 import { PAYMENT_PROVIDERS, ON_DELIVERY_KINDS } from '../../lib/constants';
@@ -98,6 +99,10 @@ export default function Payments() {
           Escolha qual gateway atende cada forma de pagamento.
         </p>
       </header>
+
+      {/* Antes de tudo: para onde o dinheiro vai. Qualquer outra configuração
+          desta tela é detalhe perto disso. */}
+      <ContaMercadoPago />
 
       {noneActive && (
         <Card className="mb-4 flex items-start gap-3 border-danger/40 bg-danger/10 p-4">

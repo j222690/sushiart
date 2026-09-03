@@ -1,4 +1,5 @@
 import { corsHeaders, json, requireEnv, serviceClient, userClient } from '../_shared/utils.ts';
+import { contaMercadoPago } from '../_shared/mercadopago.ts';
 
 /**
  * Roteador de pagamento.
@@ -212,12 +213,12 @@ async function createAsaasPix(order: any): Promise<Charge> {
 // Docs: POST https://api.mercadopago.com/checkout/preferences
 //       POST https://api.mercadopago.com/v1/payments
 // ---------------------------------------------------------------------------
-async function mercadoPagoFetch(path: string, init: RequestInit = {}) {
+async function mercadoPagoFetch(token: string, path: string, init: RequestInit = {}) {
   const response = await fetch(`https://api.mercadopago.com${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${requireEnv('MERCADOPAGO_ACCESS_TOKEN')}`,
+      Authorization: `Bearer ${token}`,
       ...(init.headers ?? {}),
     },
   });
@@ -242,7 +243,11 @@ async function createMercadoPagoCheckout(order: any, appOrigin: string): Promise
   const supabaseUrl = requireEnv('SUPABASE_URL');
   const backUrl = `${appOrigin}/pedidos/${order.id}`;
 
-  const preference = await mercadoPagoFetch('/checkout/preferences', {
+  // De qual conta sai a cobrança: a que o dono conectou no painel, ou a de
+  // ambiente enquanto ele não conectou. Ver `_shared/mercadopago.ts`.
+  const conta = await contaMercadoPago();
+
+  const preference = await mercadoPagoFetch(conta.token, '/checkout/preferences', {
     method: 'POST',
     body: JSON.stringify({
       items: [
@@ -289,19 +294,32 @@ async function createMercadoPagoCheckout(order: any, appOrigin: string): Promise
     // restaurante nunca receberia — e nada no fluxo acusaria o erro, porque a
     // preferência é criada com sucesso nos dois casos.
     //
-    // Quem sabe o ambiente é o token: o de teste começa com `TEST-`.
-    checkout_url: requireEnv('MERCADOPAGO_ACCESS_TOKEN').startsWith('TEST-')
+    // Quem sabe o ambiente é o token: o de teste começa com `TEST-`. Olha o
+    // token que foi REALMENTE usado, não o de ambiente — depois do OAuth eles
+    // são diferentes, e conferir o errado voltaria a mandar cliente de
+    // produção para o checkout de mentira.
+    checkout_url: conta.token.startsWith('TEST-')
       ? (preference.sandbox_init_point ?? preference.init_point)
       : preference.init_point,
-    payload: { mercadopago: { preference_id: preference.id } },
+    payload: {
+      mercadopago: {
+        preference_id: preference.id,
+        // Fica registrado em qual conta a cobrança nasceu: sem isso, um
+        // pedido feito antes da conexão e um feito depois ficam idênticos no
+        // banco, e não dá para explicar depois por que um caiu numa conta e
+        // outro noutra.
+        conta_do_restaurante: conta.doRestaurante,
+      },
+    },
   };
 }
 
 /** Pix pelo Mercado Pago — usado se o painel apontar o Pix para cá. */
 async function createMercadoPagoPix(order: any): Promise<Charge> {
   const supabaseUrl = requireEnv('SUPABASE_URL');
+  const conta = await contaMercadoPago();
 
-  const payment = await mercadoPagoFetch('/v1/payments', {
+  const payment = await mercadoPagoFetch(conta.token, '/v1/payments', {
     method: 'POST',
     headers: {
       // Recriar a cobrança do mesmo pedido não gera dois Pix.
@@ -329,7 +347,13 @@ async function createMercadoPagoPix(order: any): Promise<Charge> {
     pix_code: pix.qr_code ?? null,
     qr_code_base64: pix.qr_code_base64 ?? null,
     expires_at: payment.date_of_expiration ?? null,
-    payload: { mercadopago: { id: payment.id, status: payment.status } },
+    payload: {
+      mercadopago: {
+        id: payment.id,
+        status: payment.status,
+        conta_do_restaurante: conta.doRestaurante,
+      },
+    },
   };
 }
 

@@ -213,6 +213,46 @@ export const adminSettings = {
     );
   },
 
+  // -------------------------------------------------------------------------
+  // Conta do Mercado Pago (OAuth)
+  //
+  // Enquanto ninguém conecta, as cobranças saem do token de ambiente — que é
+  // do desenvolvedor. O dinheiro cai na conta errada. Conectar aqui é o que
+  // corrige isso.
+  // -------------------------------------------------------------------------
+
+  /** Status da conexão. Nunca devolve token: a função no banco filtra. */
+  async mercadoPagoStatus() {
+    return unwrap(
+      await supabase.rpc('mp_connection_status'),
+      'Não foi possível verificar a conta do Mercado Pago.'
+    );
+  },
+
+  /**
+   * Começa a conexão e devolve o link para autorizar.
+   *
+   * Passa pela Edge Function, e não por um link montado aqui, por dois
+   * motivos: o `client_secret` não pode chegar ao navegador, e o `state` que
+   * protege o retorno precisa nascer no servidor para valer alguma coisa.
+   */
+  async mercadoPagoConnectUrl() {
+    const { data, error } = await supabase.functions.invoke('mercadopago-oauth/start', {
+      method: 'POST',
+    });
+    if (error) {
+      throw new Error(
+        data?.error ?? 'Não foi possível iniciar a conexão com o Mercado Pago.'
+      );
+    }
+    return data.url;
+  },
+
+  async mercadoPagoDisconnect() {
+    const { error } = await supabase.rpc('mp_disconnect');
+    if (error) throw new Error(friendlyError(error, 'Não foi possível desconectar.'));
+  },
+
   async rouletteConfig() {
     return unwrap(
       await supabase.from('roulette_config').select('*').eq('id', 1).single(),

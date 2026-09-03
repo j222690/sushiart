@@ -1,4 +1,5 @@
 import { json, requireEnv, safeEqual, serviceClient } from '../_shared/utils.ts';
+import { contaMercadoPago } from '../_shared/mercadopago.ts';
 
 /**
  * Webhook do Mercado Pago (cartão de crédito e Pix).
@@ -73,8 +74,15 @@ async function confirmar(paymentId: string): Promise<Response> {
   // ----------------------------------------------------------------------
   // Confirmação na fonte.
   // ----------------------------------------------------------------------
+  // Na MESMA conta em que a cobrança nasceu. Depois que o dono conecta a conta
+  // dele, um pagamento criado por ela é invisível para o token de ambiente: a
+  // consulta voltaria 404, o webhook responderia 500, o Mercado Pago tentaria
+  // de novo umas vezes e desistiria — e o pedido ficaria preso em "aguardando
+  // pagamento" com o dinheiro já cobrado do cliente.
+  const conta = await contaMercadoPago();
+
   const resposta = await fetch(`${MP_API}/v1/payments/${paymentId}`, {
-    headers: { Authorization: `Bearer ${requireEnv('MERCADOPAGO_ACCESS_TOKEN')}` },
+    headers: { Authorization: `Bearer ${conta.token}` },
   });
 
   const pagamento = await resposta.json().catch(() => ({}));
