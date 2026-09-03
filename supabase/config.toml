@@ -44,3 +44,9 @@ verify_jwt = false
 # `/callback` confere o `state` de uso único que o `/start` gravou.
 [functions.mercadopago-oauth]
 verify_jwt = false
+
+# Purchase pelo servidor. Sem JWT porque quem chama é o BANCO (gatilho com
+# pg_net), que não tem sessão de usuário — a função confere o `x-push-secret`,
+# o mesmo do send-push.
+[functions.meta-capi]
+verify_jwt = false

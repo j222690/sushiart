@@ -12,7 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { formatPhone, shortHour, WEEKDAYS } from '../../lib/format';
-import { requestPushPermission } from '../../lib/push';
+import AvisosDoPedido from '../../components/AvisosDoPedido';
 import { PAINEL } from '../../lib/rotas';
 
 function Row({ icon: Icon, label, value, onClick }) {
@@ -66,13 +66,6 @@ export default function Profile() {
     } finally {
       setSaving(false);
     }
-  }
-
-  async function handlePush(enabled) {
-    if (!enabled) return;
-    const result = await requestPushPermission(user?.id);
-    if (result.ok) toast.success('Notificações ativadas.');
-    else toast.error(result.reason);
   }
 
   if (!user) {
@@ -150,6 +143,12 @@ export default function Profile() {
 
       <InstalarApp />
 
+      {/* Avisos do pedido: permissão do navegador, sempre mostrando o estado
+          de verdade. É coisa diferente do interruptor de ofertas logo abaixo,
+          que é preferência de marketing guardada no banco — misturar os dois
+          era o motivo de a permissão nunca chegar a ser pedida. */}
+      <AvisosDoPedido userId={user.id} />
+
       <Card className="mb-4 divide-y divide-line overflow-hidden">
         <Row icon={MapPin} label="Meus endereços" onClick={() => navigate('/enderecos')} />
         <Row icon={Heart} label="Favoritos" onClick={() => navigate('/favoritos')} />
@@ -159,11 +158,13 @@ export default function Profile() {
       <Card className="mb-4 p-4">
         <Switch
           checked={Boolean(customer?.marketing_opt_in)}
+          // Só mexe na preferência do banco. Ligar push a partir daqui era o
+          // bug: como o campo nasce `true`, ninguém encostava no interruptor e
+          // a permissão do navegador nunca era pedida.
           onChange={async (value) => {
             try {
               const updated = await profileApi.update(user.id, { marketing_opt_in: value });
               setCustomer(updated);
-              await handlePush(value);
             } catch (error) {
               toast.error(error.message);
             }

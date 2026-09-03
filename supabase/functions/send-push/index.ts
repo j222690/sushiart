@@ -23,6 +23,8 @@ type NotificationRow = {
   id: string;
   customer_id: string | null;
   audience: 'cliente' | 'equipe';
+  // Propaganda só sai para quem aceitou; aviso de pedido vai sempre.
+  kind: 'transacional' | 'marketing';
   title: string;
   body: string;
   data: Record<string, unknown>;
@@ -155,7 +157,7 @@ Deno.serve(async (req) => {
 
     const { data } = await admin
       .from('notifications')
-      .select('id, customer_id, audience, title, body, data')
+      .select('id, customer_id, audience, kind, title, body, data')
       .eq('id', notificationId)
       .single();
 
@@ -171,7 +173,47 @@ Deno.serve(async (req) => {
     // audience 'equipe' → todos os aparelhos da equipe.
     // audience 'cliente' + customer_id null → broadcast para toda a base.
 
-    const { data: tokens } = await query;
+    let { data: tokens } = await query;
+
+    // ---------------------------------------------------------------------
+    // Propaganda só para quem aceitou.
+    //
+    // O aviso do próprio pedido a pessoa pediu ao comprar, e vai sempre. Já
+    // "hot roll com 20% hoje" é propaganda: quem desligou "avisos de ofertas"
+    // no perfil não pode receber.
+    //
+    // Antes desta trava o interruptor existia na tela e não fazia nada — a
+    // campanha ia para todo mundo com o app instalado. Mandar promoção para
+    // quem disse não é o caminho mais curto para a desinstalação.
+    //
+    // O filtro é feito aqui, e não numa consulta só, porque `push_tokens` não
+    // guarda a preferência: ela vive em `customers`.
+    // ---------------------------------------------------------------------
+    if (notification.kind === 'marketing' && tokens?.length) {
+      const { data: aceitam } = await admin
+        .from('customers')
+        .select('id')
+        .eq('marketing_opt_in', true);
+
+      const permitidos = new Set((aceitam ?? []).map((c: { id: string }) => c.id));
+
+      const { data: donos } = await admin
+        .from('push_tokens')
+        .select('id, customer_id')
+        .in('id', tokens.map((t) => t.id));
+
+      const idsPermitidos = new Set(
+        (donos ?? [])
+          .filter((d: { customer_id: string }) => permitidos.has(d.customer_id))
+          .map((d: { id: string }) => d.id)
+      );
+
+      tokens = tokens.filter((t) => idsPermitidos.has(t.id));
+
+      if (!tokens.length) {
+        return json({ sent: 0, failed: 0, removed: 0, reason: 'ninguém aceitou marketing' });
+      }
+    }
 
     if (!tokens?.length) {
       return json({ sent: 0, failed: 0, removed: 0, reason: 'nenhum aparelho registrado' });

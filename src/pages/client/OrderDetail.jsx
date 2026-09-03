@@ -11,6 +11,7 @@ import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { formatBRL, formatDateTime } from '../../lib/format';
 import { paymentLabel } from '../../lib/constants';
+import { trackPurchase } from '../../lib/analytics';
 
 /**
  * Status em que o pedido já está firmado e o carimbo faz sentido.
@@ -19,6 +20,31 @@ import { paymentLabel } from '../../lib/constants';
  * — carimbar um pedido cancelado seria o app comemorando o que deu errado.
  */
 const PEDIDO_FIRMADO = new Set([
+  'pago',
+  'confirmado_entrega',
+  'em_preparo',
+  'saiu_para_entrega',
+  'pronto_para_retirada',
+  'entregue',
+]);
+
+/**
+ * Status em que o dinheiro está garantido — e só nestes a venda conta.
+ *
+ * `pago` vem do webhook do gateway, depois de o Mercado Pago confirmar na
+ * fonte. `confirmado_entrega` é o pagamento na entrega, que o restaurante
+ * aceitou. Os dois representam venda real.
+ *
+ * Fica de fora `aguardando_pagamento`, que é exatamente o pedido criado e não
+ * pago — contar ali encheria o relatório de campanha de vendas que nunca
+ * aconteceram, e a Meta otimizaria a verba para trazer gente que abandona o
+ * carrinho.
+ *
+ * Os status seguintes (em preparo, saiu para entrega, entregue) também contam:
+ * um pedido só chega neles depois de ter passado por um dos dois de cima, e a
+ * pessoa pode abrir a tela pela primeira vez já com o pedido a caminho.
+ */
+const VENDA_CONFIRMADA = new Set([
   'pago',
   'confirmado_entrega',
   'em_preparo',
@@ -56,6 +82,34 @@ export default function OrderDetail() {
   // Recarrega inteiro (e não só o registro) para trazer o histórico atualizado.
   const onChange = useCallback(() => load(), [load]);
   useRealtimeOrders({ orderId, onChange });
+
+  // -------------------------------------------------------------------------
+  // Purchase — a conversão de verdade.
+  //
+  // Dispara pela MUDANÇA DE STATUS do pedido, não pelo clique de finalizar nem
+  // pela criação. O pedido chega aqui como `aguardando_pagamento` e vira `pago`
+  // quando o webhook do gateway confirmar; é esse momento que esta tela observa
+  // (em tempo real) e é ele que vale como venda.
+  //
+  // Recarregar a página não conta de novo: `trackPurchase` guarda os pedidos já
+  // contados e devolve `false` no segundo disparo. A trava vive lá, e não aqui,
+  // porque a mesma proteção precisa valer para qualquer tela que venha a
+  // marcar uma venda.
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    if (!order || !VENDA_CONFIRMADA.has(order.status)) return;
+
+    trackPurchase({
+      orderId: order.id,
+      totalCentavos: order.total_cents,
+      itens: (order.order_items ?? []).map((item) => ({
+        id: item.product_id,
+        nome: item.product_name,
+        precoCentavos: item.unit_price_cents,
+        quantidade: item.quantity,
+      })),
+    });
+  }, [order]);
 
   if (error) {
     return (

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { supabase } from '../lib/supabase';
 
 /**
@@ -15,6 +15,15 @@ import { supabase } from '../lib/supabase';
  * @param {boolean}  [options.enabled]
  */
 export function useRealtimeOrders({ customerId, orderId, onChange, enabled = true }) {
+  // Nome de canal único por assinante.
+  //
+  // Sem isso, dois componentes que assinam a mesma coisa (o layout do painel e
+  // a tela de Pedidos, ambos sem filtro) pediam o canal `orders:todos` — e o
+  // Supabase entrega o evento a UM só. O segundo ficava mudo, sem erro nenhum
+  // no console: foi assim que o sino de pedido novo parou de tocar quando
+  // passou a viver no layout.
+  const instancia = useId();
+
   useEffect(() => {
     if (!enabled) return undefined;
 
@@ -23,7 +32,7 @@ export function useRealtimeOrders({ customerId, orderId, onChange, enabled = tru
     else if (customerId) filter = `customer_id=eq.${customerId}`;
 
     const channel = supabase
-      .channel(`orders:${orderId ?? customerId ?? 'todos'}`)
+      .channel(`orders:${orderId ?? customerId ?? 'todos'}:${instancia}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', ...(filter ? { filter } : {}) },
@@ -35,5 +44,5 @@ export function useRealtimeOrders({ customerId, orderId, onChange, enabled = tru
       supabase.removeChannel(channel);
     };
     // `onChange` deve vir memoizado (useCallback) para não reassinar a cada render.
-  }, [customerId, orderId, enabled, onChange]);
+  }, [customerId, orderId, enabled, onChange, instancia]);
 }

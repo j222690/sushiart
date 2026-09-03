@@ -7,6 +7,7 @@ import { formatBRL } from '../lib/format';
 import { menu } from '../lib/api';
 import { useCart } from '../store/cart';
 import { useToast } from '../context/ToastContext';
+import { trackAddToCart, trackViewContent } from '../lib/analytics';
 
 /**
  * Detalhe do produto com adicionais e observação por item.
@@ -27,6 +28,16 @@ export default function ProductSheet({ product, open, onClose, isFavorite, onTog
     setNotes('');
     setSelected({});
     setGroups(null);
+
+    // ViewContent: a ficha aberta é o equivalente a pegar o prato na mão.
+    // Fica aqui e não no clique do card porque a ficha também abre por link
+    // direto (`?produto=`), e por ali o clique nunca acontece.
+    trackViewContent({
+      id: product.id,
+      nome: product.name,
+      precoCentavos: product.effective_price_cents ?? product.price_cents,
+      categoria: product.categories?.name,
+    });
 
     let alive = true;
     menu
@@ -93,6 +104,18 @@ export default function ProductSheet({ product, open, onClose, isFavorite, onTog
       addons: chosenAddons.map((a) => ({ id: a.id, name: a.name, price_cents: a.price_cents })),
       notes,
     });
+
+    // Com o preço do que foi realmente escolhido: base mais adicionais. Mandar
+    // só o preço da vitrine subestimaria o carrinho no relatório.
+    trackAddToCart(
+      {
+        id: product.id,
+        nome: product.name,
+        precoCentavos: basePrice + addonsTotal,
+        categoria: product.categories?.name,
+      },
+      quantity
+    );
     toast.success(`${quantity}x ${product.name} no carrinho.`);
     onClose();
   }

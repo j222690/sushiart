@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, UtensilsCrossed, Tag, Gift, CreditCard,
-  BarChart3, Settings as SettingsIcon, LogOut, Menu, X, Store,
+  BarChart3, Settings as SettingsIcon, LogOut, Menu, X, Store, Volume2,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { LogoMark } from '../components/Logo';
@@ -11,6 +11,10 @@ import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import PushToggle from '../components/admin/PushToggle';
 import { PAINEL, PAINEL_ENTRAR, rotaPainel } from '../lib/rotas';
+import { desligarModoPainel } from '../lib/modoPainel';
+import { useRealtimeOrders } from '../hooks/useRealtimeOrders';
+import { useToast } from '../context/ToastContext';
+import { liberarNoPrimeiroToque, prepararSino, sinoLiberado, sinoLigado, tocarSino } from '../lib/sinoDaCozinha';
 
 const NAV = [
   { to: PAINEL, label: 'Visão geral', icon: LayoutDashboard, end: true },
@@ -22,6 +26,75 @@ const NAV = [
   { to: rotaPainel('relatorios'), label: 'Relatórios', icon: BarChart3 },
   { to: rotaPainel('configuracoes'), label: 'Configurações', icon: SettingsIcon },
 ];
+
+/**
+ * O sino de pedido novo, montado no LAYOUT e não na tela de Pedidos.
+ *
+ * Antes o som existia só dentro de `/pedidos`. Numa cozinha real o painel fica
+ * aberto onde parou — na Visão geral, no Cardápio conferindo um esgotado — e
+ * ali o pedido entrava calado. Aqui embaixo do layout, toca em qualquer tela
+ * do painel.
+ *
+ * Três toques, não um: um bipe sozinho se perde no barulho de uma cozinha em
+ * movimento, e pedido não ouvido é pedido atrasado.
+ */
+function SinoDePedidoNovo() {
+  const toast = useToast();
+  const conhecidos = useRef(new Set());
+  const [bloqueado, setBloqueado] = useState(false);
+
+  // O navegador libera áudio no primeiro toque da pessoa. Enquanto isso não
+  // acontece, o painel avisa — em vez de ficar mudo esperando alguém descobrir
+  // no pedido perdido.
+  useEffect(() => {
+    const solta = liberarNoPrimeiroToque();
+    const conferir = setInterval(() => setBloqueado(sinoLigado() && !sinoLiberado()), 1500);
+    return () => {
+      solta();
+      clearInterval(conferir);
+    };
+  }, []);
+
+  const aoMudar = useCallback(
+    (linha, evento) => {
+      if (evento !== 'INSERT' || !linha?.id) return;
+
+      // Um mesmo pedido pode chegar duas vezes se a conexão do realtime
+      // reconectar. Sem esta trava, a cozinha ouviria o sino em dobro e
+      // desconfiaria de pedido duplicado.
+      if (conhecidos.current.has(linha.id)) return;
+      conhecidos.current.add(linha.id);
+
+      if (sinoLigado()) tocarSino(3);
+      toast.success(`Pedido novo: ${linha.code}`);
+    },
+    [toast]
+  );
+
+  useRealtimeOrders({ onChange: aoMudar });
+
+  if (!bloqueado) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        prepararSino();
+        tocarSino(1);
+        setBloqueado(false);
+      }}
+      className="mb-4 flex w-full items-center gap-3 rounded-card border border-warning/40 bg-warning/10 px-4 py-3 text-left"
+    >
+      <Volume2 size={18} className="shrink-0 text-warning" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-cream">Som bloqueado pelo navegador</span>
+        <span className="block text-xs text-cream-muted">
+          Toque aqui para liberar o aviso de pedido novo neste aparelho.
+        </span>
+      </span>
+    </button>
+  );
+}
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -87,7 +160,8 @@ export default function AdminLayout() {
             type="button"
             onClick={async () => {
               await signOut();
-              navigate(PAINEL_ENTRAR);
+              desligarModoPainel();
+                  navigate(PAINEL_ENTRAR);
             }}
             className="flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm text-cream-muted hover:bg-ink-300 hover:text-cream"
           >
@@ -144,6 +218,7 @@ export default function AdminLayout() {
                 type="button"
                 onClick={async () => {
                   await signOut();
+                  desligarModoPainel();
                   navigate(PAINEL_ENTRAR);
                 }}
                 className="mt-6 flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm text-cream-muted"
@@ -155,7 +230,8 @@ export default function AdminLayout() {
         )}
 
         <main className="min-w-0 flex-1 p-4 lg:p-6">
-          <Outlet />
+          <SinoDePedidoNovo />
+        <Outlet />
         </main>
       </div>
     </div>

@@ -238,7 +238,12 @@ create or replace function premiar_pedido_entregue()
 returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if new.status = 'entregue' and coalesce(old.status, '') <> 'entregue'
+  -- `is distinct from` e NÃO `coalesce(old.status, '')`: `status` é um enum, e
+  -- a string vazia não é um valor dele. O coalesce fazia o Postgres tentar
+  -- converter '' para `order_status` e estourar — derrubando a transação
+  -- INTEIRA do update. Resultado: a cozinha não conseguia avançar pedido
+  -- nenhum, e o erro só aparecia para quem estivesse olhando a saída do SQL.
+  if new.status = 'entregue' and old.status is distinct from 'entregue'
      and new.customer_id is not null then
 
     begin

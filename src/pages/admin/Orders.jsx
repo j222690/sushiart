@@ -12,6 +12,7 @@ import { formatBRL, formatDateTime, timeAgo, formatPhone } from '../../lib/forma
 import {
   ORDER_STATUS, KANBAN_COLUMNS, ACTIVE_STATUSES, ON_DELIVERY_KINDS, nextStatusFor, paymentLabel,
 } from '../../lib/constants';
+import { definirSino, prepararSino, sinoLigado, tocarSino } from '../../lib/sinoDaCozinha';
 
 const METHOD_ICONS = {
   pix: QrCode,
@@ -20,39 +21,6 @@ const METHOD_ICONS = {
   na_entrega: Banknote,
 };
 
-/**
- * Bipe curto para avisar de pedido novo. Usa a Web Audio API em vez de um
- * arquivo de som para não depender de asset externo — e porque o navegador
- * bloqueia áudio até a primeira interação do usuário de qualquer forma.
- */
-function useAlertSound(enabled) {
-  const ctxRef = useRef(null);
-
-  return useCallback(() => {
-    if (!enabled) return;
-    try {
-      ctxRef.current ??= new (window.AudioContext || window.webkitAudioContext)();
-      const ctx = ctxRef.current;
-      const now = ctx.currentTime;
-
-      [880, 1320].forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.0001, now + i * 0.16);
-        gain.gain.exponentialRampToValueAtTime(0.25, now + i * 0.16 + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.16 + 0.14);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(now + i * 0.16);
-        osc.stop(now + i * 0.16 + 0.16);
-      });
-    } catch {
-      // Sem áudio disponível: o painel segue funcionando normalmente.
-    }
-  }, [enabled]);
-}
-
 export default function AdminOrders() {
   const toast = useToast();
   const [params, setParams] = useSearchParams();
@@ -60,12 +28,11 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState(null);
   const [detail, setDetail] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [soundOn, setSoundOn] = useState(true);
+  const [soundOn, setSoundOn] = useState(sinoLigado);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
   const knownIds = useRef(new Set());
-  const playAlert = useAlertSound(soundOn);
 
   const load = useCallback(async () => {
     try {
@@ -99,12 +66,14 @@ export default function AdminOrders() {
       const isNew = event === 'INSERT' && !knownIds.current.has(row.id);
       if (isNew) {
         knownIds.current.add(row.id);
-        playAlert();
+        // O sino NÃO toca aqui: quem toca é o AdminLayout, que está montado em
+        // toda tela do painel. Tocar nos dois lugares daria sino dobrado
+        // quando a cozinha estivesse justamente nesta tela.
         toast.success(`Novo pedido ${row.code}!`);
       }
       await load();
     },
-    [load, playAlert, toast]
+    [load, toast]
   );
 
   useRealtimeOrders({ onChange });
@@ -246,8 +215,16 @@ export default function AdminOrders() {
           variant="secondary"
           size="sm"
           onClick={() => {
-            setSoundOn((v) => !v);
-            if (!soundOn) playAlert();
+            const novo = !soundOn;
+            setSoundOn(novo);
+            definirSino(novo);
+            // Ao LIGAR, toca uma vez: é o clique que libera o áudio no
+            // navegador, e serve de confirmação de que o som funciona neste
+            // aparelho — sem isso a pessoa só descobre no primeiro pedido.
+            if (novo) {
+              prepararSino();
+              tocarSino(1);
+            }
           }}
         >
           {soundOn ? <Volume2 size={15} /> : <VolumeX size={15} />}

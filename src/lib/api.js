@@ -1,5 +1,37 @@
 import { supabase, friendlyError } from './supabase';
 import { STORAGE_BUCKET } from './constants';
+import { atribuicaoDoPedido } from './analytics/atribuicao';
+
+/**
+ * Guarda de qual campanha veio este pedido.
+ *
+ * Deliberadamente sem `await` de quem chama e com todo erro engolido: é dado
+ * de marketing pendurado num pedido que já existe. Falhar aqui custa uma linha
+ * de relatório; atrasar ou derrubar a criação do pedido custa a venda.
+ *
+ * Sem origem nenhuma (cliente que digitou o endereço) não grava nada — melhor
+ * a ausência de linha do que uma linha de nulos.
+ */
+async function registrarAtribuicao(orderId) {
+  if (!orderId) return;
+
+  const origem = atribuicaoDoPedido();
+  if (!origem) return;
+
+  try {
+    const { data } = await supabase.auth.getUser();
+
+    const { error } = await supabase
+      .from('order_attribution')
+      .insert({ order_id: orderId, customer_id: data?.user?.id ?? null, ...origem });
+
+    if (error && import.meta.env.DEV) {
+      console.warn('[analytics] não gravou a atribuição:', error.message);
+    }
+  } catch (erro) {
+    if (import.meta.env.DEV) console.warn('[analytics] atribuição:', erro);
+  }
+}
 
 /** Lança com mensagem já legível, para o componente só fazer catch e mostrar. */
 function unwrap({ data, error }, fallback) {
@@ -255,7 +287,19 @@ export const orders = {
    * Veja create_order() em 0003_functions.sql.
    */
   async create(payload) {
-    return unwrap(await supabase.rpc('create_order', { p_payload: payload }), 'Não foi possível criar o pedido.');
+    const pedido = unwrap(
+      await supabase.rpc('create_order', { p_payload: payload }),
+      'Não foi possível criar o pedido.'
+    );
+
+    // Grava de onde veio a venda, DEPOIS do pedido existir e sem `await`
+    // no caminho de retorno: é dado de marketing, e nenhum pedido pode
+    // demorar mais — nem falhar — por causa dele. Se esta gravação der
+    // errado, perde-se um dado de campanha; se ela atrapalhasse o pedido,
+    // perder-se-ia a venda.
+    registrarAtribuicao(pedido?.id ?? pedido?.order_id);
+
+    return pedido;
   },
 
   async list(userId) {

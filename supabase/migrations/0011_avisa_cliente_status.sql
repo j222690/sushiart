@@ -8,6 +8,12 @@
 --
 -- O texto muda conforme entrega ou retirada, porque "saiu para entrega" não
 -- quer dizer nada para quem vai buscar no balcão.
+--
+-- SEM O CÓDIGO DO PEDIDO. Antes todo aviso trazia "SA-000013", e ninguém fala
+-- assim: quem está esperando comida tem UM pedido em aberto e não precisa que
+-- ele seja identificado por número. O código continua na tela do pedido, onde
+-- serve para consulta, e no aviso de cancelamento — que é o único em que o
+-- cliente vai ligar e precisa dizer de qual pedido se trata.
 
 create or replace function notify_customer_status()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -22,15 +28,15 @@ begin
   case new.status
     when 'em_preparo' then
       v_titulo := 'Seu pedido está no fogo 🔥';
-      v_corpo  := 'Começamos a preparar o ' || new.code || '. Já já sai!';
+      v_corpo  := 'Já estamos preparando tudo. Não vai demorar!';
 
     when 'saiu_para_entrega' then
       v_titulo := 'Saiu para entrega 🛵';
-      v_corpo  := 'O pedido ' || new.code || ' está a caminho. Fique de olho na campainha!';
+      v_corpo  := 'Seu pedido está a caminho. Fique de olho na campainha!';
 
     when 'pronto_para_retirada' then
       v_titulo := 'Pronto para retirar 🍣';
-      v_corpo  := 'O pedido ' || new.code || ' está pronto e esperando por você no balcão.';
+      v_corpo  := 'Está pronto e esperando por você no balcão.';
 
     when 'entregue' then
       -- Quem recebeu já sabe que recebeu. O aviso aqui serve para fechar o
@@ -38,8 +44,8 @@ begin
       v_titulo := 'Bom apetite! 🥢';
       v_corpo  := case
                     when new.fulfillment = 'retirada'
-                      then 'Pedido ' || new.code || ' retirado. Obrigado pela preferência!'
-                    else 'Pedido ' || new.code || ' entregue. Obrigado pela preferência!'
+                      then 'Obrigado pela preferência! Esperamos você de novo.'
+                    else 'Seu pedido chegou. Obrigado pela preferência!'
                   end;
 
     when 'cancelado' then
@@ -48,6 +54,9 @@ begin
       if not is_staff() then
         return new;
       end if;
+      -- O código FICA aqui, e só aqui, entre os avisos do cliente: cancelamento
+      -- é o caso em que ele vai ligar para entender, e citar o pedido é o que
+      -- faz o atendimento achar do que se trata sem interrogatório.
       v_titulo := 'Pedido cancelado';
       v_corpo  := 'O pedido ' || new.code || ' foi cancelado'
                   || coalesce(': ' || new.cancel_reason, '.')

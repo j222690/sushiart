@@ -6,6 +6,7 @@ import { Button, Card, Input } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { PAINEL } from '../../lib/rotas';
+import { desligarModoPainel, ligarModoPainel } from '../../lib/modoPainel';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -16,7 +17,12 @@ export default function AdminLogin() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loading && isStaff) navigate(PAINEL, { replace: true });
+    if (loading || !isStaff) return;
+    // A partir daqui este aparelho abre direto no painel. Fica gravado só
+    // neste aparelho: o dono pode usar o celular pessoal como cliente e o do
+    // balcão como painel.
+    ligarModoPainel();
+    navigate(PAINEL, { replace: true });
   }, [loading, isStaff, navigate]);
 
   async function handleSubmit(event) {
@@ -99,7 +105,13 @@ export default function AdminLogin() {
 
         <button
           type="button"
-          onClick={() => navigate('/')}
+          onClick={() => {
+            // Sair daqui a pé desliga o modo painel: quem foi para o app do
+            // cliente de propósito não quer ser trazido de volta na próxima
+            // abertura.
+            desligarModoPainel();
+            navigate('/');
+          }}
           className="mt-5 block w-full text-center text-xs text-cream-faint hover:text-cream-muted"
         >
           Ir para o app do cliente

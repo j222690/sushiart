@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MapPin, Plus, Ticket, X, QrCode, CreditCard, Banknote, Store, Sparkles, Check,
@@ -14,6 +14,7 @@ import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { formatBRL, installmentOptions, parseBRLToCents } from '../../lib/format';
 import { ON_DELIVERY_KINDS } from '../../lib/constants';
+import { trackInitiateCheckout } from '../../lib/analytics';
 
 const METHOD_ICONS = {
   pix: QrCode,
@@ -122,6 +123,25 @@ export default function Checkout() {
       ? Math.floor((subtotal * Number(loyalty.reward_percent)) / 100)
       : loyalty.reward_cents ?? 0;
   }, [redeemLoyalty, loyalty, points, subtotal]);
+
+  // InitiateCheckout: uma vez, quando a tela de fechamento aparece com
+  // carrinho de verdade. `useRef` porque esta tela re-renderiza a cada
+  // digitação de endereço e a cada troca de forma de pagamento — sem a trava
+  // seriam dezenas de eventos para um único checkout.
+  const checkoutContado = useRef(false);
+  useEffect(() => {
+    if (checkoutContado.current || items.length === 0) return;
+    checkoutContado.current = true;
+    trackInitiateCheckout({
+      itens: items.map((i) => ({
+        id: i.product_id,
+        nome: i.name,
+        precoCentavos: i.unit_price_cents,
+        quantidade: i.quantity,
+      })),
+      totalCentavos: subtotal,
+    });
+  }, [items, subtotal]);
 
   const methodConfig = methods.find((m) => m.method === method);
 

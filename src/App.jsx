@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { StoreProvider } from './context/StoreContext';
 import { ToastProvider } from './context/ToastContext';
@@ -14,6 +14,9 @@ import Home from './pages/client/Home';
 import Menu from './pages/client/Menu';
 import Cart from './pages/client/Cart';
 import { PAINEL, PAINEL_ENTRAR } from './lib/rotas';
+import { iniciarAnalytics } from './lib/analytics';
+import { useRastreioDeRota } from './hooks/useRastreioDeRota';
+import { devePularParaPainel } from './lib/modoPainel';
 
 const Search = lazy(() => import('./pages/client/Search'));
 const Offers = lazy(() => import('./pages/client/Offers'));
@@ -63,6 +66,51 @@ function RequireStaff({ children }) {
   if (loading) return <SplashScreen message="Verificando acesso..." />;
   if (!isStaff) return <Navigate to={PAINEL_ENTRAR} replace />;
   return children;
+}
+
+/**
+ * Liga o analytics e conta a navegação.
+ *
+ * Componente separado, e dentro do BrowserRouter, porque `useRastreioDeRota`
+ * depende de `useLocation` — que só existe abaixo do roteador. Fora dele, o
+ * app quebra na montagem.
+ *
+ * Não renderiza nada: é só o lugar onde os ganchos podem viver.
+ */
+function Analytics() {
+  useEffect(() => {
+    iniciarAnalytics();
+  }, []);
+
+  useRastreioDeRota();
+  return null;
+}
+
+/**
+ * Abre direto no painel, no aparelho que já foi usado como painel.
+ *
+ * Evita o dono ter que fazer o gesto dos sete toques a cada turno. Só age no
+ * primeiro carregamento e só na raiz — quem tocou numa notificação de pedido
+ * quer ver o pedido, não ser levado para outro lugar.
+ */
+function DesvioDoPainel() {
+  const { isStaff, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const jaDecidiu = useRef(false);
+
+  useEffect(() => {
+    if (loading || jaDecidiu.current) return;
+    jaDecidiu.current = true;
+
+    if (devePularParaPainel(isStaff, location.pathname)) {
+      navigate(PAINEL, { replace: true });
+    }
+    // Só o primeiro carregamento importa: depois disso a pessoa navega sozinha.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, isStaff]);
+
+  return null;
 }
 
 function AppRoutes() {
@@ -135,6 +183,8 @@ export default function App() {
         <AuthProvider>
           <StoreProvider>
             <ScrollToTop />
+            <Analytics />
+            <DesvioDoPainel />
             <AppRoutes />
           </StoreProvider>
         </AuthProvider>
