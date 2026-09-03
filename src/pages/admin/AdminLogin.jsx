@@ -3,14 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 import { LogoMark } from '../../components/Logo';
 import { Button, Card, Input } from '../../components/ui';
-import GoogleButton from '../../components/GoogleButton';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { signInWithPassword, signInWithGoogle, isStaff, loading, user, signOut } = useAuth();
+  const { signInWithPassword, isStaff, loading, user, signOut } = useAuth();
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -83,24 +82,15 @@ export default function AdminLogin() {
                 Entrar no painel
               </Button>
 
-              <div className="flex items-center gap-3 pt-1">
-                <span className="h-px flex-1 bg-line" />
-                <span className="text-[11px] uppercase tracking-wider text-cream-faint">ou</span>
-                <span className="h-px flex-1 bg-line" />
-              </div>
-
-              {/* Volta para /admin/entrar, não para a home: se a conta não for da
-                  equipe, é aqui que está a explicação. Quem entra pelo painel no
-                  meio do movimento não pode cair no app do cliente sem entender
-                  por quê. */}
-              <GoogleButton
-                disabled={submitting || loading}
-                onClick={() => signInWithGoogle('/admin/entrar')}
-              />
-
+              {/* Sem entrada pelo Google aqui, de propósito — ela continua no app
+                  do cliente, que é onde faz sentido.
+                  O painel é conta de trabalho, criada por um administrador. Botão
+                  do Google numa tela dessas convida quem passa a tentar entrar
+                  com a conta pessoal, não consegue, e acha que o sistema quebrou.
+                  Entrar nunca ia funcionar mesmo: o acesso é liberado pela tabela
+                  de equipe, não por ter feito login. */}
               <p className="text-center text-[11px] leading-relaxed text-cream-faint">
-                O acesso ao painel é liberado por um administrador. Entrar aqui não
-                cria conta de equipe.
+                O acesso ao painel é liberado por um administrador.
               </p>
             </form>
           )}
