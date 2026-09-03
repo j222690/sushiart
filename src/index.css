@@ -91,6 +91,42 @@
     background-size: 34px 17px;
   }
 
+  /* O mesmo padrão como FUNDO DE PÁGINA.
+   *
+   * Vai no contêiner do layout, e não no `body`: o contêiner tem `bg-ink`
+   * opaco e pintava por cima do fundo da página — o padrão existia e ficava
+   * escondido atrás dele. Foi o que aconteceu na primeira tentativa.
+   *
+   * A cor vai embutida em vez de `currentColor` porque este elemento carrega
+   * o texto do app inteiro, e herdar dali pintaria as ondas da cor da letra.
+   *
+   * Os cards são brancos e opacos, então o padrão só aparece nas frestas
+   * entre eles — que é onde antes havia bege liso. Textura, não estampa: a
+   * esta opacidade o olho registra que existe algo ali sem conseguir dizer o
+   * quê, e é esse o efeito.
+   *
+   * `background-attachment` fica no padrão, e não `fixed`: fundo fixo obriga
+   * o navegador a repintar a tela inteira a cada quadro de rolagem, que é
+   * exatamente o tipo de travada que a gente tirou do app.
+   */
+  .fundo-seigaiha {
+    background-image: radial-gradient(
+        circle at 50% 100%,
+        transparent 32%,
+        rgba(34, 64, 94, 0.07) 33%,
+        rgba(34, 64, 94, 0.07) 39%,
+        transparent 40%
+      ),
+      radial-gradient(
+        circle at 50% 100%,
+        transparent 18%,
+        rgba(34, 64, 94, 0.07) 19%,
+        rgba(34, 64, 94, 0.07) 25%,
+        transparent 26%
+      );
+    background-size: 34px 17px;
+  }
+
   /* Emenda kintsugi: a linha que separa os produtos vira um veio de ouro
      interrompido, como a cerâmica remendada. Os cortes são fixos e não
      regulares de propósito — emenda de verdade não é simétrica.
