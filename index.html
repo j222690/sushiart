@@ -4,7 +4,53 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
     <meta name="theme-color" content="#F6F3EF" />
-    <meta name="description" content="Sushi Art — Empório do Sushi. Amor em forma de sushi. Peça online em Chapecó/SC." />
+
+    <!-- =====================================================================
+         BUSCA
+
+         O app é uma SPA: o Google até roda JavaScript, mas o que ele lê rápido
+         e com confiança é o HTML estático que vem no primeiro carregamento. Por
+         isso título, descrição e dados estruturados moram AQUI, e não em
+         componentes React — se dependessem da renderização, a busca veria uma
+         página em branco.
+
+         O alvo é quem procura "sushi Chapecó" e hoje só encontra o iFood, que
+         leva uma parte de cada pedido. O título e a descrição carregam prato +
+         cidade porque é assim que a pessoa digita; "Sushi Art" sozinho só é
+         encontrado por quem já conhece a casa — e esse já sabe o caminho.
+         ===================================================================== -->
+    <title>Sushi Art — Delivery de Sushi em Chapecó/SC | Empório do Sushi</title>
+    <meta
+      name="description"
+      content="Delivery de sushi em Chapecó/SC. Combinados, temakis, hot rolls, niguiris e sashimis feitos na hora. Peça pelo site com entrega em 20 bairros ou retire no local. Pix, cartão e pagamento na entrega."
+    />
+    <link rel="canonical" href="https://www.sushiarts.online/" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+
+    <!-- Compartilhamento no WhatsApp e no Instagram, que é por onde delivery
+         circula de verdade. Sem isso o link vira uma caixa cinza sem imagem, e
+         link sem imagem quase não é clicado. -->
+    <meta property="og:type" content="restaurant.restaurant" />
+    <meta property="og:site_name" content="Sushi Art — Empório do Sushi" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="https://www.sushiarts.online/" />
+    <meta property="og:title" content="Sushi Art — Delivery de Sushi em Chapecó/SC" />
+    <meta
+      property="og:description"
+      content="Combinados, temakis, hot rolls e sashimis feitos na hora. Entrega em 20 bairros de Chapecó ou retirada no local."
+    />
+    <meta property="og:image" content="https://www.sushiarts.online/icon-512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="Sushi Art — Empório do Sushi" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Sushi Art — Delivery de Sushi em Chapecó/SC" />
+    <meta
+      name="twitter:description"
+      content="Combinados, temakis, hot rolls e sashimis feitos na hora. Entrega em 20 bairros de Chapecó."
+    />
+    <meta name="twitter:image" content="https://www.sushiarts.online/icon-512.png" />
+
     <!-- Icones gerados a partir da logo oficial (public/logo-sushiart.jpg).
          O SVG desenhado saiu daqui: era outro desenho, e o texto dele depende
          de webfont, que nao carrega em contexto de favicon. -->
@@ -18,10 +64,164 @@
       href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <title>Sushi Art — Empório do Sushi</title>
+
+    <!-- =====================================================================
+         Dados estruturados (schema.org)
+
+         É o que faz o Google mostrar horário, faixa de preço e avaliação
+         direto no resultado, em vez de só um link azul. Para restaurante isso
+         vale mais que qualquer palavra-chave.
+
+         O QUE ESTÁ FALTANDO DE PROPÓSITO: `address` e `telephone`. No banco
+         eles ainda são "Rua a definir", "s/n" e "(49) 3000-0000" — dados de
+         teste. Publicar endereço e telefone falsos é pior do que não publicar:
+         o Google cruza esses campos com o Google Meu Negócio e com outros
+         sites, e divergência derruba a posição em busca local em vez de
+         ajudar. Assim que o endereço e o telefone reais entrarem no painel,
+         basta acrescentar aqui.
+         ===================================================================== -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Restaurant",
+        "@id": "https://www.sushiarts.online/#restaurante",
+        "name": "Sushi Art — Empório do Sushi",
+        "description": "Delivery de sushi em Chapecó/SC. Combinados, temakis, hot rolls, niguiris e sashimis feitos na hora.",
+        "url": "https://www.sushiarts.online/",
+        "image": "https://www.sushiarts.online/icon-512.png",
+        "logo": "https://www.sushiarts.online/icon-512.png",
+        "servesCuisine": ["Japonesa", "Sushi"],
+        "priceRange": "R$ 5 - R$ 125",
+        "currenciesAccepted": "BRL",
+        "paymentAccepted": "Pix, Cartão de crédito, Cartão de débito, Dinheiro",
+        "hasMenu": "https://www.sushiarts.online/cardapio",
+        "acceptsReservations": "False",
+        "sameAs": ["https://instagram.com/sushiartchapeco"],
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Chapecó",
+          "addressRegion": "SC",
+          "addressCountry": "BR"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": -27.1009,
+          "longitude": -52.6156
+        },
+        "openingHoursSpecification": [
+          {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Sunday"],
+            "opens": "18:30",
+            "closes": "23:00"
+          },
+          {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Tuesday", "Wednesday", "Thursday"],
+            "opens": "18:30",
+            "closes": "23:30"
+          },
+          {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Friday", "Saturday"],
+            "opens": "18:30",
+            "closes": "23:59"
+          }
+        ],
+        "potentialAction": {
+          "@type": "OrderAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://www.sushiarts.online/cardapio",
+            "inLanguage": "pt-BR",
+            "actionPlatform": [
+              "http://schema.org/DesktopWebPlatform",
+              "http://schema.org/IOSPlatform",
+              "http://schema.org/AndroidPlatform"
+            ]
+          },
+          "deliveryMethod": [
+            "http://purl.org/goodrelations/v1#DeliveryModeOwnFleet",
+            "http://purl.org/goodrelations/v1#DeliveryModePickUp"
+          ]
+        },
+        "areaServed": [
+          { "@type": "City", "name": "Chapecó" },
+          { "@type": "Place", "name": "Centro, Chapecó" },
+          { "@type": "Place", "name": "Efapi, Chapecó" },
+          { "@type": "Place", "name": "Passo dos Fortes, Chapecó" },
+          { "@type": "Place", "name": "Universitário, Chapecó" },
+          { "@type": "Place", "name": "São Cristóvão, Chapecó" },
+          { "@type": "Place", "name": "Jardim América, Chapecó" },
+          { "@type": "Place", "name": "Presidente Médici, Chapecó" },
+          { "@type": "Place", "name": "Bela Vista, Chapecó" },
+          { "@type": "Place", "name": "Santa Maria, Chapecó" },
+          { "@type": "Place", "name": "Seminário, Chapecó" },
+          { "@type": "Place", "name": "Maria Goretti, Chapecó" },
+          { "@type": "Place", "name": "Palmital, Chapecó" },
+          { "@type": "Place", "name": "Cristo Rei, Chapecó" },
+          { "@type": "Place", "name": "Esplanada, Chapecó" },
+          { "@type": "Place", "name": "Belvedere, Chapecó" },
+          { "@type": "Place", "name": "Jardim Itália, Chapecó" },
+          { "@type": "Place", "name": "Líder, Chapecó" },
+          { "@type": "Place", "name": "Engenho Braun, Chapecó" },
+          { "@type": "Place", "name": "Quedas do Palmital, Chapecó" },
+          { "@type": "Place", "name": "Vila Rica, Chapecó" }
+        ]
+      }
+    </script>
+
+    <!-- A caixa de busca que o Google às vezes mostra abaixo do resultado. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "@id": "https://www.sushiarts.online/#site",
+        "url": "https://www.sushiarts.online/",
+        "name": "Sushi Art — Empório do Sushi",
+        "inLanguage": "pt-BR",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://www.sushiarts.online/busca?q={search_term_string}"
+          },
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- =====================================================================
+         Conteúdo para quem não roda JavaScript — incluindo rastreador ruim e
+         leitor de tela em conexão fraca. Some assim que o React monta.
+
+         Não é truque de busca: é o mesmo que o app diz, em texto. Esconder do
+         usuário algo que o buscador vê é o que o Google chama de cloaking e
+         pune; aqui o conteúdo é idêntico, só chega antes.
+         ===================================================================== -->
+    <noscript>
+      <div style="max-width: 40rem; margin: 0 auto; padding: 2rem 1.25rem; font-family: system-ui, sans-serif; line-height: 1.6; color: #211d1b">
+        <h1 style="font-size: 1.5rem">Sushi Art — Empório do Sushi</h1>
+        <p><strong>Delivery de sushi em Chapecó/SC.</strong> Amor em forma de sushi.</p>
+        <p>
+          Combinados, temakis, hot rolls, niguiris, sashimis, uramakis e hossomakis feitos na hora.
+          Entrega nos bairros Centro, Efapi, Passo dos Fortes, Universitário, São Cristóvão,
+          Jardim América, Presidente Médici, Bela Vista, Santa Maria, Seminário, Maria Goretti,
+          Palmital, Cristo Rei, Esplanada, Belvedere, Jardim Itália, Líder, Engenho Braun,
+          Quedas do Palmital e Vila Rica — ou retirada no local.
+        </p>
+        <p>Aberto de terça a domingo, a partir das 18h30. Pix, cartão e pagamento na entrega.</p>
+        <p>
+          <strong>Este site precisa de JavaScript para funcionar.</strong> Ative o JavaScript no seu
+          navegador para ver o cardápio e fazer o pedido.
+        </p>
+        <p><a href="https://instagram.com/sushiartchapeco">Instagram @sushiartchapeco</a></p>
+      </div>
+    </noscript>
+
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

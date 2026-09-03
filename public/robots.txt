@@ -1,0 +1,25 @@
+# Sushi Art — Empório do Sushi
+# https://www.sushiarts.online
+
+User-agent: *
+Allow: /
+
+# O painel não tem nada para a busca e é área de trabalho do restaurante.
+# Isto não é segurança — quem protege /admin é o login e a RLS do banco. É só
+# para o Google não gastar rastreamento com telas que ninguém vai procurar.
+Disallow: /admin
+Disallow: /admin/
+
+# Telas que só fazem sentido com sessão: aparecem vazias para o rastreador e,
+# indexadas, viram resultado de busca que leva a lugar nenhum.
+Disallow: /carrinho
+Disallow: /checkout
+Disallow: /pagamento/
+Disallow: /pedidos
+Disallow: /perfil
+Disallow: /enderecos
+Disallow: /favoritos
+Disallow: /notificacoes
+Disallow: /fidelidade
+
+Sitemap: https://www.sushiarts.online/sitemap.xml

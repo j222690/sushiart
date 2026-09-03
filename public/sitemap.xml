@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Só as páginas que fazem sentido em resultado de busca.
+
+  Carrinho, checkout e perfil ficam de fora: sem sessão eles aparecem vazios,
+  e uma página vazia indexada é pior que página nenhuma — vira resultado que
+  leva o cliente a lugar nenhum e ensina o Google que o site é raso.
+
+  `priority` é dica, não ordem: o Google decide sozinho. Serve para dizer que
+  o cardápio importa mais que a política de privacidade, que é verdade.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.sushiarts.online/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://www.sushiarts.online/cardapio</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.sushiarts.online/ofertas</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.sushiarts.online/privacidade.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  <url>
+    <loc>https://www.sushiarts.online/termos.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+</urlset>
