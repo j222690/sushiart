@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PAINEL_ENTRAR } from '../lib/rotas';
 
 /** Quantos toques abrem o painel. */
 const TOQUES = 7;
@@ -20,7 +21,7 @@ const JANELA_MS = 2500;
  * A porta dos fundos do painel.
  *
  * O problema que ela resolve: o app instalado no celular abre direto na home
- * do cliente, e não existe link nenhum para `/admin` ali. O dono teria que
+ * do cliente, e não existe link nenhum para o painel ali. O dono teria que
  * digitar o endereço na barra do navegador toda vez — e num app instalado,
  * que roda sem barra de endereço, isso simplesmente não dá.
  *
@@ -30,7 +31,7 @@ const JANELA_MS = 2500;
  * na logo uma ou duas vezes por curiosidade não chega a lugar nenhum.
  *
  * IMPORTANTE: isto NÃO é segurança. Não esconde nada nem protege nada — a
- * tela `/admin/entrar` é pública e sempre foi, e quem digitar o endereço
+ * tela de entrada do painel é pública, e quem souber o endereço
  * chega nela do mesmo jeito. Quem realmente barra a entrada é o login e a
  * tabela de equipe, no servidor. Aqui é só conveniência: um atalho para o
  * dono, que não polui o app do cliente com um botão que não é para ele.
@@ -52,7 +53,7 @@ export default function PortaDosFundos({ children, className }) {
     if (toques.current >= TOQUES) {
       toques.current = 0;
       setFaltam(0);
-      navigate('/admin/entrar');
+      navigate(PAINEL_ENTRAR);
       return;
     }
 

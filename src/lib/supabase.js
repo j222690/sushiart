@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { PAINEL } from './rotas';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -18,7 +19,12 @@ export const supabase = createClient(url, anonKey, {
     detectSessionInUrl: true,
     // Chaves separadas evitam que o login do admin derrube a sessão do
     // cliente na mesma máquina (o dono testando o app no próprio celular).
-    storageKey: window.location.pathname.startsWith('/admin')
+    //
+    // O caminho do painel vem de `rotas.js`, não escrito à mão: quando o
+    // endereço mudou de `/admin` para um código, um `startsWith('/admin')`
+    // esquecido aqui faria o painel e o app compartilharem a mesma chave —
+    // e aí um login derrubaria o outro, com sintoma difícil de ligar à causa.
+    storageKey: window.location.pathname.startsWith(PAINEL)
       ? 'sushiart.admin.auth'
       : 'sushiart.client.auth',
   },

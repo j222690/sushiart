@@ -123,7 +123,15 @@ Deno.serve(async (req) => {
             ? 'Teste do painel: os avisos de pedido novo vão chegar assim.'
             : 'Teste: é assim que os avisos do seu pedido vão chegar.',
         tag: 'teste',
-        data: { url: audience === 'equipe' ? '/admin/pedidos' : '/pedidos' },
+        // O caminho do painel vem do ambiente: não é mais `/admin` fixo.
+        // Errado aqui, a equipe toca no aviso de pedido novo e cai numa
+        // página que não existe — no meio do movimento.
+        data: {
+          url:
+            audience === 'equipe'
+              ? `/${Deno.env.get('ADMIN_PATH') ?? 'admin'}/pedidos`
+              : '/pedidos',
+        },
       });
 
       return json(result);

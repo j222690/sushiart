@@ -10,16 +10,17 @@ import { Badge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import PushToggle from '../components/admin/PushToggle';
+import { PAINEL, PAINEL_ENTRAR, rotaPainel } from '../lib/rotas';
 
 const NAV = [
-  { to: '/admin', label: 'Visão geral', icon: LayoutDashboard, end: true },
-  { to: '/admin/pedidos', label: 'Pedidos', icon: ClipboardList },
-  { to: '/admin/cardapio', label: 'Cardápio', icon: UtensilsCrossed },
-  { to: '/admin/promocoes', label: 'Promoções', icon: Tag },
-  { to: '/admin/roleta', label: 'Roleta e fidelidade', icon: Gift },
-  { to: '/admin/pagamentos', label: 'Pagamentos', icon: CreditCard },
-  { to: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
-  { to: '/admin/configuracoes', label: 'Configurações', icon: SettingsIcon },
+  { to: PAINEL, label: 'Visão geral', icon: LayoutDashboard, end: true },
+  { to: rotaPainel('pedidos'), label: 'Pedidos', icon: ClipboardList },
+  { to: rotaPainel('cardapio'), label: 'Cardápio', icon: UtensilsCrossed },
+  { to: rotaPainel('promocoes'), label: 'Promoções', icon: Tag },
+  { to: rotaPainel('roleta'), label: 'Roleta e fidelidade', icon: Gift },
+  { to: rotaPainel('pagamentos'), label: 'Pagamentos', icon: CreditCard },
+  { to: rotaPainel('relatorios'), label: 'Relatórios', icon: BarChart3 },
+  { to: rotaPainel('configuracoes'), label: 'Configurações', icon: SettingsIcon },
 ];
 
 export default function AdminLayout() {
@@ -86,7 +87,7 @@ export default function AdminLayout() {
             type="button"
             onClick={async () => {
               await signOut();
-              navigate('/admin/entrar');
+              navigate(PAINEL_ENTRAR);
             }}
             className="flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm text-cream-muted hover:bg-ink-300 hover:text-cream"
           >
@@ -143,7 +144,7 @@ export default function AdminLayout() {
                 type="button"
                 onClick={async () => {
                   await signOut();
-                  navigate('/admin/entrar');
+                  navigate(PAINEL_ENTRAR);
                 }}
                 className="mt-6 flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm text-cream-muted"
               >

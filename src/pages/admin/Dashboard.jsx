@@ -13,6 +13,7 @@ import { useToast } from '../../context/ToastContext';
 import { useRealtimeOrders } from '../../hooks/useRealtimeOrders';
 import { formatBRL, timeAgo } from '../../lib/format';
 import { ORDER_STATUS, ACTIVE_STATUSES } from '../../lib/constants';
+import { rotaPainel } from '../../lib/rotas';
 
 /** Início e fim do dia de hoje no fuso local, em ISO. */
 function todayRange() {
@@ -200,7 +201,7 @@ export default function Dashboard() {
         <Card className="flex flex-col p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-brand text-lg text-cream">Fila agora</h2>
-            <Button size="sm" variant="ghost" onClick={() => navigate('/admin/pedidos')}>
+            <Button size="sm" variant="ghost" onClick={() => navigate(rotaPainel('pedidos'))}>
               Abrir <ChevronRight size={14} />
             </Button>
           </div>
@@ -213,7 +214,7 @@ export default function Dashboard() {
                 <li key={order.id}>
                   <button
                     type="button"
-                    onClick={() => navigate(`/admin/pedidos?pedido=${order.id}`)}
+                    onClick={() => navigate(`${rotaPainel('pedidos')}?pedido=${order.id}`)}
                     className="flex w-full items-center gap-3 rounded-xl border border-line bg-ink-300 px-3 py-2.5 text-left hover:border-vinho-500/40"
                   >
                     <div className="min-w-0 flex-1">

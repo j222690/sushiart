@@ -5,6 +5,7 @@ import { LogoMark } from '../../components/Logo';
 import { Button, Card, Input } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { PAINEL } from '../../lib/rotas';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ export default function AdminLogin() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loading && isStaff) navigate('/admin', { replace: true });
+    if (!loading && isStaff) navigate(PAINEL, { replace: true });
   }, [loading, isStaff, navigate]);
 
   async function handleSubmit(event) {
@@ -32,7 +33,7 @@ export default function AdminLogin() {
     }
   }
 
-  // Cliente comum que digitou /admin: mostra o motivo em vez de tela branca.
+  // Cliente comum que chegou aqui: mostra o motivo em vez de tela branca.
   const loggedButNotStaff = !loading && user && !isStaff;
 
   return (

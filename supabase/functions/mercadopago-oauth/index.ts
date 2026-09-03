@@ -29,10 +29,18 @@ import { corsHeaders, json, requireEnv, serviceClient, userClient } from '../_sh
 const MP_AUTH = 'https://auth.mercadopago.com.br/authorization';
 const MP_API = 'https://api.mercadopago.com';
 
-/** Para onde o dono volta depois de autorizar (ou de dar errado). */
+/**
+ * Para onde o dono volta depois de autorizar (ou de dar errado).
+ *
+ * O caminho do painel vem do ambiente porque não é mais `/admin` fixo — foi
+ * trocado por um código para robô de varredura não achar. Se este endereço
+ * ficasse desatualizado, o dono autorizaria com sucesso no Mercado Pago e
+ * cairia numa página que não existe, sem saber se funcionou.
+ */
 function paginaDoPainel(status: string, mensagem?: string): string {
   const base = Deno.env.get('APP_ORIGIN') ?? 'https://www.sushiarts.online';
-  const url = new URL('/admin/pagamentos', base);
+  const painel = Deno.env.get('ADMIN_PATH') ?? 'admin';
+  const url = new URL(`/${painel}/pagamentos`, base);
   url.searchParams.set('mp', status);
   if (mensagem) url.searchParams.set('mensagem', mensagem);
   return url.toString();

@@ -21,6 +21,18 @@ import { formatBRL } from '../../lib/format';
 import { fundoCategoria } from '../../lib/emojiCategoria';
 import { iconeCategoria } from '../../lib/iconesCategoria';
 
+/**
+ * A diagonal que dissolve a foto do card de categoria na cor de fundo.
+ *
+ * 115° em vez de 90°: a 90° a divisa fica vertical e o card lê como duas
+ * metades coladas. Inclinada, os dois lados parecem uma coisa só.
+ *
+ * A transição é longa de propósito (de 18% a 78%) — corte curto vira uma borda
+ * dura no meio da foto, que é o mesmo defeito de recorte que se queria evitar.
+ */
+const DIAGONAL =
+  'linear-gradient(115deg, transparent 30%, rgba(0,0,0,0.45) 52%, rgba(0,0,0,0.9) 72%, #000 82%)';
+
 /** Faixa horizontal reutilizada nos vários carrosséis da home. */
 function Rail({ title, subtitle, icon: Icon, action, children }) {
   return (
@@ -327,23 +339,33 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
             {byCategory.map((category, i) => {
               const Icone = iconeCategoria(category);
+              // Uma foto de prato desta categoria, para o card dizer do que se
+              // trata sem depender só do ícone. A primeira que existir serve:
+              // os produtos já vêm na ordem definida no painel, então é a que
+              // o restaurante escolheu mostrar primeiro.
+              const foto = category.products.find((p) => p.image_url)?.image_url;
 
               return (
               <button
                 key={category.id}
                 type="button"
                 onClick={() => navigate(`/cardapio?categoria=${category.slug}`)}
-                // Sem foto, como as faixas do topo. A foto de um prato recortada
-                // num retângulo de 96 px não mostra prato nenhum — vira mancha
-                // colorida. Figura grande diz a categoria de longe, e o fundo em
-                // cor cheia dá o destaque que a foto não estava dando.
+                // Foto de um lado, cor do outro, com o encontro em diagonal.
+                //
+                // A versão anterior não tinha foto nenhuma, porque um prato
+                // recortado num retângulo baixo vira mancha colorida. Só que o
+                // que resolve não é tirar a foto: é não deixar a foto ocupar a
+                // parte onde vai o texto. Ela entra pela direita e se dissolve
+                // na diagonal, então o nome e o preço caem sempre sobre cor
+                // cheia — legíveis com qualquer foto — e o prato aparece do
+                // outro lado dizendo do que é a categoria.
                 // Coluna com o texto empurrado para baixo, em vez do texto solto
                 // em `absolute bottom-0`: naquele arranjo a figura ficava no
                 // fluxo e o título fora dele, então num card de 96 px os dois se
                 // encontravam e o nome passava por cima da figura. Em coluna
                 // eles não têm como se sobrepor, em qualquer altura de card.
                 className={clsx(
-                  'relative flex h-24 flex-col overflow-hidden rounded-card bg-gradient-to-br p-3 text-left shadow-card',
+                  'relative flex h-28 flex-col overflow-hidden rounded-card bg-gradient-to-br p-3 text-left shadow-card',
                   'transition-transform active:scale-[0.98]',
                   fundoCategoria(i)
                 )}
@@ -355,9 +377,38 @@ export default function Home() {
                   className="seigaiha pointer-events-none absolute inset-0 text-white opacity-[0.09]"
                 />
 
-                <Icone className="pointer-events-none absolute -right-3 -top-2 h-[62px] w-[62px] text-white opacity-[0.18]" />
+                {foto ? (
+                  <img
+                    src={foto}
+                    alt=""
+                    aria-hidden="true"
+                    loading="lazy"
+                    decoding="async"
+                    // A máscara é o que faz a diagonal: onde ela é transparente
+                    // a foto some e sobra a cor; onde é opaca, a foto aparece.
+                    // Com `-webkit-` junto porque o Safari ainda pede.
+                    style={{ maskImage: DIAGONAL, WebkitMaskImage: DIAGONAL }}
+                    className="pointer-events-none absolute inset-y-0 right-0 h-full w-[58%] object-cover"
+                  />
+                ) : (
+                  // Sem foto, o ícone grande volta a preencher o canto.
+                  <Icone className="pointer-events-none absolute -right-3 -top-2 h-[62px] w-[62px] text-white opacity-[0.18]" />
+                )}
 
-                <Icone className="relative h-5 w-5 text-white" />
+                {/* Véu no canto de baixo à esquerda, só quando há foto.
+                    Sem ele o nome e o preço caem sobre a parte clara de
+                    algumas fotos e somem — testei e "Sobremesas" e "Bebidas"
+                    ficaram ilegíveis. A diagonal sozinha não garante: depende
+                    de como cada prato foi fotografado, e isso muda a cada foto
+                    que o restaurante trocar. */}
+                {foto && (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/60 via-black/15 to-transparent"
+                  />
+                )}
+
+                <Icone className="relative h-5 w-5 text-white drop-shadow" />
 
                 <div className="relative mt-auto min-w-0">
                   <p className="truncate font-brand text-sm leading-tight text-white">

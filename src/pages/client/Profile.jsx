@@ -13,6 +13,7 @@ import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { formatPhone, shortHour, WEEKDAYS } from '../../lib/format';
 import { requestPushPermission } from '../../lib/push';
+import { PAINEL } from '../../lib/rotas';
 
 function Row({ icon: Icon, label, value, onClick }) {
   return (
@@ -80,7 +81,7 @@ export default function Profile() {
         <div className="flex flex-col items-center text-center">
           {/* Sete toques na marca abrem o painel. É por aqui que o dono entra
               no app instalado, que não tem barra de endereço para digitar
-              /admin. Ver o comentário do componente: não é segurança, é
+              o painel. Ver o comentário do componente: não é segurança, é
               atalho. */}
           <PortaDosFundos>
             <Logo size="lg" />
@@ -189,7 +190,7 @@ export default function Profile() {
           />
         )}
         {isStaff && (
-          <Row icon={ShieldCheck} label="Painel do restaurante" onClick={() => navigate('/admin')} />
+          <Row icon={ShieldCheck} label="Painel do restaurante" onClick={() => navigate(PAINEL)} />
         )}
       </Card>
 

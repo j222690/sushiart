@@ -13,6 +13,7 @@ import AdminLayout from './layouts/AdminLayout';
 import Home from './pages/client/Home';
 import Menu from './pages/client/Menu';
 import Cart from './pages/client/Cart';
+import { PAINEL, PAINEL_ENTRAR } from './lib/rotas';
 
 const Search = lazy(() => import('./pages/client/Search'));
 const Offers = lazy(() => import('./pages/client/Offers'));
@@ -27,7 +28,7 @@ const Loyalty = lazy(() => import('./pages/client/Loyalty'));
 const Notifications = lazy(() => import('./pages/client/Notifications'));
 const Login = lazy(() => import('./pages/client/Login'));
 
-// O painel só é baixado por quem realmente abre /admin.
+// O painel só é baixado por quem realmente abre o endereço dele.
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders'));
@@ -55,12 +56,12 @@ function ScrollToTop() {
   return null;
 }
 
-/** Barreira do painel: sem sessão de staff, ninguém entra em /admin. */
+/** Barreira do painel: sem sessão de staff, ninguém entra. */
 function RequireStaff({ children }) {
   const { loading, isStaff } = useAuth();
 
   if (loading) return <SplashScreen message="Verificando acesso..." />;
-  if (!isStaff) return <Navigate to="/admin/entrar" replace />;
+  if (!isStaff) return <Navigate to={PAINEL_ENTRAR} replace />;
   return children;
 }
 
@@ -102,9 +103,9 @@ function AppRoutes() {
 
 
         {/* --------------------------------- Painel --------------------------------- */}
-        <Route path="/admin/entrar" element={<AdminLogin />} />
+        <Route path={PAINEL_ENTRAR} element={<AdminLogin />} />
         <Route
-          path="/admin"
+          path={PAINEL}
           element={
             <RequireStaff>
               <AdminLayout />

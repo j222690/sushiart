@@ -4,9 +4,17 @@
 User-agent: *
 Allow: /
 
-# O painel não tem nada para a busca e é área de trabalho do restaurante.
-# Isto não é segurança — quem protege /admin é o login e a RLS do banco. É só
-# para o Google não gastar rastreamento com telas que ninguém vai procurar.
+# O painel do restaurante NÃO é listado aqui de propósito.
+#
+# robots.txt é público: qualquer um lê. Escrever o endereço do painel neste
+# arquivo seria publicar exatamente o que se quer manter fora do radar — é o
+# primeiro lugar onde um robô de varredura procura caminho interessante.
+#
+# Ele não precisa estar aqui: não há link nenhum apontando para o painel em
+# nenhuma página do site, então o Google não tem por onde chegar.
+#
+# A entrada antiga continua bloqueada, para o que já foi rastreado sair do
+# índice.
 Disallow: /admin
 Disallow: /admin/
 
