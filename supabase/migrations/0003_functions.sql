@@ -640,7 +640,7 @@ begin
       insert into loyalty_transactions (customer_id, order_id, points, kind, description, expires_at)
       values (
         new.customer_id, new.id, v_points, 'ganho',
-        'Pontos do pedido ' || new.code,
+        'Pontos do seu último pedido',
         case when v_cfg.expire_days is not null
              then now() + make_interval(days => v_cfg.expire_days) end
       );
@@ -656,7 +656,7 @@ begin
     if new.points_redeemed > 0 then
       insert into loyalty_transactions (customer_id, order_id, points, kind, description)
       values (new.customer_id, new.id, new.points_redeemed, 'ajuste',
-              'Estorno de pontos do pedido cancelado ' || new.code);
+              'Estorno de pontos do pedido cancelado');
     end if;
 
     -- Libera o cupom para novo uso.
@@ -756,7 +756,8 @@ begin
   values (
     v_order.customer_id,
     'Pagamento confirmado 🎉',
-    'Recebemos o pagamento do pedido ' || v_order.code || '. Já vamos preparar!',
+    -- Idem: sem o código. Ver o comentário em 0007.
+    'Tudo certo com o pagamento. Já vamos preparar!',
     jsonb_build_object('order_id', v_order.id, 'type', 'payment')
   );
 

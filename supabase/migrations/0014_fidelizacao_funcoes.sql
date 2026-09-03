@@ -127,7 +127,7 @@ begin
   values (
     pedido.customer_id,
     'Você ganhou crédito',
-    'R$ ' || to_char(valor / 100.0, 'FM999990.00') || ' de volta do pedido ' || pedido.code || '.',
+    'R$ ' || to_char(valor / 100.0, 'FM999990.00') || ' de volta do seu último pedido.',
     jsonb_build_object('link', '/perfil')
   );
 end;

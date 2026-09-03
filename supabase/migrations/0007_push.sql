@@ -175,7 +175,10 @@ begin
     new.customer_id,
     'cliente',
     'Pedido confirmado 🍣',
-    'Recebemos o pedido ' || new.code || '. Já vamos preparar!',
+    -- Sem o código: quem acabou de fechar tem UM pedido em aberto e não
+    -- precisa que ele seja identificado por número. O código continua na
+    -- tela do pedido, para consulta.
+    'Seu pedido caiu aqui e já vamos preparar!',
     jsonb_build_object('order_id', new.id, 'type', 'confirmacao')
   );
 
