@@ -121,14 +121,20 @@ export default function ProductSheet({ product, open, onClose, isFavorite, onTog
         </div>
       }
     >
+      {/* Moldura QUADRADA, igual à foto.
+          As fotos do cardápio são 400×400. Antes esta faixa tinha altura fixa
+          e largura cheia, então sobrava espaço dos dois lados — preenchido por
+          uma cópia borrada da própria foto. Com a moldura no mesmo formato do
+          arquivo não sobra espaço nenhum: a foto preenche exata, sem borrão e
+          sem cortar nada do prato. */}
       <div className="-mx-5 -mt-4 mb-4">
         <ProductImage
           src={product.image_url}
           alt={product.name}
-          className="h-56 w-full"
+          className="aspect-square w-full"
           rounded="rounded-none"
           eager
-          fit="contain"
+          vinheta={false}
         />
       </div>
 

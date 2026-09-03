@@ -4,6 +4,8 @@ import {
   User, MapPin, Heart, Sparkles, Bell, LogOut, ChevronRight, Clock, Instagram, ShieldCheck,
 } from 'lucide-react';
 import { Logo } from '../../components/Logo';
+import PortaDosFundos from '../../components/PortaDosFundos';
+import InstalarApp from '../../components/InstalarApp';
 import { Button, Card, Input, Sheet, Switch } from '../../components/ui';
 import { profile as profileApi, promo } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -76,7 +78,13 @@ export default function Profile() {
     return (
       <div className="px-5 pt-10">
         <div className="flex flex-col items-center text-center">
-          <Logo size="lg" />
+          {/* Sete toques na marca abrem o painel. É por aqui que o dono entra
+              no app instalado, que não tem barra de endereço para digitar
+              /admin. Ver o comentário do componente: não é segurança, é
+              atalho. */}
+          <PortaDosFundos>
+            <Logo size="lg" />
+          </PortaDosFundos>
           <p className="mt-6 text-sm text-cream-muted">
             Entre para acompanhar pedidos, salvar endereços e acumular pontos.
           </p>
@@ -85,7 +93,11 @@ export default function Profile() {
           </Button>
         </div>
 
-        <Card className="mt-8 divide-y divide-line overflow-hidden">
+        <div className="mt-8">
+          <InstalarApp />
+        </div>
+
+        <Card className="divide-y divide-line overflow-hidden">
           <Row icon={Clock} label="Horário de funcionamento" onClick={() => setHoursSheet(true)} />
         </Card>
 
@@ -97,9 +109,15 @@ export default function Profile() {
   return (
     <div className="px-4 pb-8 pt-4">
       <Card className="mb-4 flex items-center gap-3.5 p-4">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-vinho-gradient text-lg font-bold text-white">
-          {(customer?.name || user.email || '?').charAt(0).toUpperCase()}
-        </span>
+        {/* O mesmo gesto da tela deslogada, agora na bolinha da inicial.
+            Precisa existir nos DOIS estados: o dono pode estar logado com uma
+            conta que ainda não é da equipe, e aí não teria nenhum caminho
+            para o painel. */}
+        <PortaDosFundos>
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-vinho-gradient text-lg font-bold text-white">
+            {(customer?.name || user.email || '?').charAt(0).toUpperCase()}
+          </span>
+        </PortaDosFundos>
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-semibold text-cream">
             {customer?.name || 'Complete seu cadastro'}
@@ -128,6 +146,8 @@ export default function Profile() {
           <ChevronRight size={16} className="text-cream-faint" />
         </button>
       )}
+
+      <InstalarApp />
 
       <Card className="mb-4 divide-y divide-line overflow-hidden">
         <Row icon={MapPin} label="Meus endereços" onClick={() => navigate('/enderecos')} />

@@ -9,6 +9,14 @@ import { LogoMark } from './Logo';
  * quente, no lugar do quadrado cinza genérico de app de fast-food. O logo vem
  * com opacidade alta o suficiente para se ler, mas baixa o suficiente para não
  * competir com o nome do prato ao lado.
+ *
+ * Só existe um modo de encaixe, `cover`, e isso é uma escolha. Havia um segundo
+ * modo que mostrava a foto inteira e preenchia a sobra com uma cópia dela
+ * borrada. Funcionava, mas as bordas desfocadas eram feias — e o problema real
+ * era outro: a moldura tinha um formato e o arquivo tinha outro. Todas as fotos
+ * do cardápio são quadradas (400×400), então basta a moldura ser quadrada
+ * também e não sobra espaço para preencher. Quem chama é que decide o formato,
+ * com `aspect-square` na classe.
  */
 export default function ProductImage({
   src,
@@ -16,11 +24,15 @@ export default function ProductImage({
   className,
   rounded = 'rounded-xl',
   eager = false,
-  fit = 'cover',
+  /**
+   * Sombra no rodapé da foto. Serve para dar contraste a texto ou selo posto
+   * POR CIMA da imagem — é o caso dos cards do cardápio. Onde nada é
+   * sobreposto, como na ficha do produto, ela só escurece o prato à toa.
+   */
+  vinheta = true,
 }) {
   const [failed, setFailed] = useState(false);
   const showFallback = !src || failed;
-  const contain = fit === 'contain';
 
   return (
     <div className={clsx('relative overflow-hidden bg-ink-900', rounded, className)}>
@@ -28,48 +40,20 @@ export default function ProductImage({
         <div className="absolute inset-0 grid place-items-center">
           <LogoMark size={44} className="opacity-40" />
         </div>
-      ) : contain ? (
-        // As fotos do cardápio são 200×200. Numa faixa larga, `cover` estica
-        // para a largura do celular e borra. Aqui a foto aparece no tamanho que
-        // aguenta, e quem preenche a sobra é uma cópia dela ampliada e
-        // desfocada — no borrão a baixa resolução não aparece.
+      ) : (
         <>
-          <img
-            src={src}
-            alt=""
-            aria-hidden="true"
-            loading={eager ? 'eager' : 'lazy'}
-            decoding="async"
-            // blur-lg, não blur-2xl: o desfoque custa proporcional ao raio, e a
-            // 40px isto travava a abertura da ficha no celular. Com mais escala
-            // e menos raio o fundo lê igual e sai quase de graça.
-            className="absolute inset-0 h-full w-full scale-150 object-cover blur-lg saturate-150"
-          />
-          <div className="absolute inset-0 bg-ink-900/40" />
           <img
             src={src}
             alt={alt}
             loading={eager ? 'eager' : 'lazy'}
             decoding="async"
             onError={() => setFailed(true)}
-            className="relative mx-auto h-full object-contain"
+            className="h-full w-full object-cover"
           />
+          {vinheta && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/45 to-transparent" />
+          )}
         </>
-      ) : (
-        <img
-          src={src}
-          alt={alt}
-          loading={eager ? 'eager' : 'lazy'}
-          decoding="async"
-          onError={() => setFailed(true)}
-          className="h-full w-full object-cover"
-        />
-      )}
-      {/* Vinheta só sob foto real em `cover`: serve para dar contraste a texto
-          sobreposto. Sobre o fallback ela sujaria o card, e sobre o fundo
-          desfocado do `contain` competiria com a foto. */}
-      {!showFallback && !contain && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/45 to-transparent" />
       )}
     </div>
   );
