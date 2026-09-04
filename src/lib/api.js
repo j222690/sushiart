@@ -546,19 +546,28 @@ export const notifications = {
    * como cliente e como equipe ao mesmo tempo.
    */
   async saveToken(userId, token, platform = 'web', audience = 'cliente') {
+    // Passa por uma função no banco em vez de gravar direto.
+    //
+    // A inscrição é do NAVEGADOR, e o `upsert` direto batia em 403 quando o
+    // mesmo aparelho já tinha sido registrado por outra conta — a RLS só deixa
+    // mexer na própria linha, e com razão. A função roda como SECURITY DEFINER,
+    // toma o aparelho para quem ativou por último, e grava sempre o
+    // `auth.uid()` do servidor: nada do que o app manda decide o dono.
     return unwrap(
-      await supabase
-        .from('push_tokens')
-        .upsert(
-          { customer_id: userId, token, platform, audience },
-          { onConflict: 'token,audience' }
-        ),
+      await supabase.rpc('registrar_push', {
+        p_token: token,
+        p_platform: platform,
+        p_audience: audience,
+      }),
       'Não foi possível registrar este aparelho para notificações.'
     );
   },
 
   async removeToken(token, audience = 'cliente') {
-    await supabase.from('push_tokens').delete().eq('token', token).eq('audience', audience);
+    // Mesmo motivo: o `delete` direto não apagava a linha de outra conta e
+    // ainda respondia sucesso — a tela dizia "desligado" e o aparelho seguia
+    // recebendo.
+    await supabase.rpc('remover_push', { p_token: token, p_audience: audience });
   },
 
   async hasToken(userId, token, audience = 'cliente') {
