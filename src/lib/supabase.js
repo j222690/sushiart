@@ -47,5 +47,25 @@ export function friendlyError(error, fallback = 'Algo deu errado. Tente de novo.
   if (/JWT expired|session/i.test(message)) return 'Sua sessão expirou. Entre novamente.';
   if (/Failed to fetch|NetworkError/i.test(message)) return 'Sem conexão com o servidor.';
 
+  // "Cannot coerce the result to a single JSON object" é o PostgREST dizendo
+  // que o `.single()` não encontrou linha nenhuma. Na prática quase sempre
+  // significa uma de duas coisas: a sessão caiu (e a RLS escondeu o registro),
+  // ou a pessoa abriu um link de algo que não é dela.
+  //
+  // Apareceu literalmente na tela do cliente numa sessão expirada. Erro cru de
+  // banco não diz nada a quem está esperando comida, e ainda dá a impressão de
+  // app quebrado quando o problema é só fazer login de novo.
+  if (/coerce the result to a single JSON object|multiple \(or no\) rows/i.test(message)) {
+    return 'Não encontramos este pedido. Se você saiu da conta, entre de novo para vê-lo.';
+  }
+
+  // Nenhuma regra casou. Em produção, texto técnico do banco não ajuda quem
+  // está do outro lado — melhor a mensagem que quem chamou preparou para o
+  // caso. Em desenvolvimento o texto original passa, para não esconder nada
+  // de quem está depurando.
+  if (!import.meta.env.DEV && /PGRST|violates|constraint|relation |column /i.test(message)) {
+    return fallback;
+  }
+
   return message || fallback;
 }

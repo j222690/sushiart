@@ -17,6 +17,7 @@ import { useToast } from '../context/ToastContext';
 import { liberarNoPrimeiroToque, prepararSino, sinoLiberado, sinoLigado, tocarSino } from '../lib/sinoDaCozinha';
 import { impressaoAutomatica, imprimirComanda } from '../lib/comanda';
 import { adminOrders } from '../lib/adminApi';
+import { ACTIVE_STATUSES } from '../lib/constants';
 
 const NAV = [
   { to: PAINEL, label: 'Visão geral', icon: LayoutDashboard, end: true },
@@ -43,8 +44,12 @@ const NAV = [
 function SinoDePedidoNovo() {
   const toast = useToast();
   const { restaurant } = useStore();
-  const conhecidos = useRef(new Set());
   const [bloqueado, setBloqueado] = useState(false);
+
+  // Pedidos que a cozinha já conhece. Começa vazio e é preenchido na primeira
+  // conferência — sem isso, ao abrir o painel com dez pedidos na fila o sino
+  // tocaria dez vezes seguidas.
+  const conhecidos = useRef(null);
 
   // O navegador libera áudio no primeiro toque da pessoa. Enquanto isso não
   // acontece, o painel avisa — em vez de ficar mudo esperando alguém descobrir
@@ -58,40 +63,77 @@ function SinoDePedidoNovo() {
     };
   }, []);
 
-  const aoMudar = useCallback(
-    (linha, evento) => {
-      if (evento !== 'INSERT' || !linha?.id) return;
+  /**
+   * Anuncia um pedido novo: sino, aviso na tela e comanda.
+   *
+   * Num lugar só porque os dois caminhos chegam aqui — o evento do tempo real
+   * e a conferência periódica. Duplicar isso seria duplicar a chance de um dos
+   * dois esquecer de imprimir.
+   */
+  const anunciar = useCallback(
+    (id, code) => {
+      if (sinoLigado()) tocarSino();
+      toast.success(`Pedido novo: ${code}`);
 
-      // Um mesmo pedido pode chegar duas vezes se a conexão do realtime
-      // reconectar. Sem esta trava, a cozinha ouviria o sino em dobro e
-      // desconfiaria de pedido duplicado.
-      if (conhecidos.current.has(linha.id)) return;
-      conhecidos.current.add(linha.id);
-
-      if (sinoLigado()) tocarSino(); // sem numero: usa o alarme cheio
-      toast.success(`Pedido novo: ${linha.code}`);
-
-      // Comanda sai sozinha, para ser grampeada no pacote.
-      //
-      // O evento do tempo real traz só a linha do pedido — sem itens, sem
-      // endereço, sem o nome do cliente. Imprimir com o que veio daria uma
-      // comanda sem o que a cozinha precisa, então buscamos o pedido inteiro
-      // antes. É uma consulta a mais por pedido, e vale.
       if (impressaoAutomatica()) {
         adminOrders
-          .get(linha.id)
+          .get(id)
           .then((completo) => imprimirComanda(completo, restaurant))
           .catch(() => {
-            // Falhar a impressão não pode esconder o pedido: o sino já tocou e
-            // ele está na tela. O aviso diz o que fazer à mão.
-            toast.error(`Não consegui imprimir a comanda do ${linha.code}. Imprima pelo pedido.`);
+            toast.error(`Não consegui imprimir a comanda do ${code}. Imprima pelo pedido.`);
           });
       }
     },
-    [toast]
+    [toast, restaurant]
   );
 
-  useRealtimeOrders({ onChange: aoMudar });
+  /**
+   * Confere a fila e anuncia o que for novo.
+   *
+   * É esta função que faz o sino funcionar mesmo quando o tempo real não
+   * entrega — e ele falha de formas silenciosas demais para a cozinha depender
+   * só dele. Um pedido não ouvido é um pedido atrasado.
+   */
+  const conferirFila = useCallback(async () => {
+    try {
+      const abertos = await adminOrders.list({ statuses: ACTIVE_STATUSES, limit: 40 });
+
+      // Primeira passada só memoriza: o que já estava na fila quando o painel
+      // abriu não é novidade.
+      if (conhecidos.current === null) {
+        conhecidos.current = new Set(abertos.map((o) => o.id));
+        return;
+      }
+
+      for (const pedido of abertos) {
+        if (conhecidos.current.has(pedido.id)) continue;
+        conhecidos.current.add(pedido.id);
+        anunciar(pedido.id, pedido.code);
+      }
+    } catch {
+      // Falha de rede numa conferência não merece alarde: a próxima acontece
+      // em segundos, e o tempo real pode ter pegado antes.
+    }
+  }, [anunciar]);
+
+  const aoMudar = useCallback(
+    (linha, evento) => {
+      // O tempo real trouxe um pedido novo: anuncia na hora, sem esperar a
+      // próxima conferência.
+      if (evento === 'INSERT' && linha?.id) {
+        if (conhecidos.current === null) conhecidos.current = new Set();
+        if (conhecidos.current.has(linha.id)) return;
+        conhecidos.current.add(linha.id);
+        anunciar(linha.id, linha.code);
+        return;
+      }
+      // Qualquer outra coisa (inclusive a conferência periódica): olha a fila.
+      conferirFila();
+    },
+    [anunciar, conferirFila]
+  );
+
+  useRealtimeOrders({ onChange: aoMudar, pollMs: 10000 });
 
   if (!bloqueado) return null;
 
