@@ -4,6 +4,33 @@ import { sincronizarInscricao } from '../lib/push';
 
 const AuthContext = createContext(null);
 
+/**
+ * Entrega o JWT da sessão à conexão de tempo real.
+ *
+ * O tempo real avalia a RLS com o token que a CONEXÃO apresenta, não com o das
+ * consultas normais. Sem isto ela sobe como anônima: `auth.uid()` fica nulo, a
+ * política de `orders` nega tudo, e nenhum evento é entregue — sem erro no
+ * console, sem aviso, sem nada.
+ *
+ * Era o que estava acontecendo em produção. Só funcionava logo após um login,
+ * porque aí o evento `SIGNED_IN` configura a autorização por conta própria. Ao
+ * RECARREGAR a página, com a sessão restaurada, a autorização não era refeita:
+ *
+ *   - o cliente não via o pedido andar sem recarregar;
+ *   - a cozinha não ouvia o sino de pedido novo;
+ *   - o Purchase do navegador não disparava no momento do pagamento.
+ *
+ * Os três com a mesma raiz, e nenhum deles dava sinal de erro.
+ */
+function autorizarRealtime(sessao) {
+  try {
+    supabase.realtime.setAuth(sessao?.access_token ?? null);
+  } catch {
+    // Versão sem o método ou conexão ainda não iniciada. O app segue
+    // funcionando: o que se perde é a atualização ao vivo, não o pedido.
+  }
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [customer, setCustomer] = useState(null);
@@ -33,12 +60,14 @@ export function AuthProvider({ children }) {
 
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
+      autorizarRealtime(data.session);
       setSession(data.session);
       await loadIdentity(data.session?.user?.id);
       setLoading(false);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      autorizarRealtime(newSession);
       setSession(newSession);
       loadIdentity(newSession?.user?.id);
     });
