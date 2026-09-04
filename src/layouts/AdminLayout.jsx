@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, UtensilsCrossed, Tag, Gift, CreditCard,
-  BarChart3, Settings as SettingsIcon, LogOut, Menu, X, Store, Volume2,
+  BarChart3, Settings as SettingsIcon, LogOut, Menu, X, Store, Volume2, Megaphone,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { LogoMark } from '../components/Logo';
@@ -24,6 +24,7 @@ const NAV = [
   { to: rotaPainel('pedidos'), label: 'Pedidos', icon: ClipboardList },
   { to: rotaPainel('cardapio'), label: 'Cardápio', icon: UtensilsCrossed },
   { to: rotaPainel('promocoes'), label: 'Promoções', icon: Tag },
+  { to: rotaPainel('campanhas'), label: 'Campanhas', icon: Megaphone },
   { to: rotaPainel('roleta'), label: 'Roleta e fidelidade', icon: Gift },
   { to: rotaPainel('pagamentos'), label: 'Pagamentos', icon: CreditCard },
   { to: rotaPainel('relatorios'), label: 'Relatórios', icon: BarChart3 },

@@ -314,3 +314,49 @@ export const adminReports = {
     return unwrap(await supabase.rpc('report_customers', { p_from: from, p_to: to }), 'Relatório indisponível.');
   },
 };
+
+// ---------------------------------------------------------------------------
+// Campanhas
+//
+// Disparar aviso para toda a base. Passa por funções no banco porque quem
+// decide o público e a permissão é o servidor: `enviar_campanha` confere
+// `is_admin()`, e a entrega respeita quem aceitou marketing.
+// ---------------------------------------------------------------------------
+export const adminCampanhas = {
+  /** A mensagem que faz sentido agora, com o motivo da escolha. */
+  async sugerir() {
+    const { data, error } = await supabase.rpc('sugerir_campanha');
+    if (error) throw new Error(friendlyError(error, 'Não foi possível sugerir uma mensagem.'));
+    return Array.isArray(data) ? data[0] ?? null : data;
+  },
+
+  /** A biblioteca inteira, com os marcadores já preenchidos. */
+  async modelos() {
+    return unwrap(await supabase.rpc('listar_modelos'), 'Não foi possível carregar as mensagens.');
+  },
+
+  async enviar({ titulo, corpo, link }) {
+    return unwrap(
+      await supabase.rpc('enviar_campanha', {
+        p_titulo: titulo,
+        p_corpo: corpo,
+        p_link: link || '/ofertas',
+      }),
+      'Não foi possível enviar a campanha.'
+    );
+  },
+
+  /** O que já foi disparado — evita repetir e mostra o que foi tentado. */
+  async historico(limite = 12) {
+    return unwrap(
+      await supabase
+        .from('notifications')
+        .select('id, title, body, created_at')
+        .is('customer_id', null)
+        .eq('audience', 'cliente')
+        .order('created_at', { ascending: false })
+        .limit(limite),
+      'Não foi possível carregar o histórico.'
+    );
+  },
+};

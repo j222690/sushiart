@@ -37,6 +37,7 @@ const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders'));
 const MenuAdmin = lazy(() => import('./pages/admin/MenuAdmin'));
 const Promotions = lazy(() => import('./pages/admin/Promotions'));
+const Campanhas = lazy(() => import('./pages/admin/Campanhas'));
 const RouletteAdmin = lazy(() => import('./pages/admin/RouletteAdmin'));
 const Payments = lazy(() => import('./pages/admin/Payments'));
 const Reports = lazy(() => import('./pages/admin/Reports'));
@@ -164,6 +165,7 @@ function AppRoutes() {
           <Route path="pedidos" element={<AdminOrders />} />
           <Route path="cardapio" element={<MenuAdmin />} />
           <Route path="promocoes" element={<Promotions />} />
+          <Route path="campanhas" element={<Campanhas />} />
           <Route path="roleta" element={<RouletteAdmin />} />
           <Route path="pagamentos" element={<Payments />} />
           <Route path="relatorios" element={<Reports />} />
