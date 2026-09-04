@@ -12,6 +12,7 @@ import Noren from '../../components/Noren';
 import Lanternas from '../../components/Lanternas';
 import Sakura from '../../components/Sakura';
 import PedirDeNovo from '../../components/PedirDeNovo';
+import AvisosDoPedido from '../../components/AvisosDoPedido';
 import { Badge, Button, Card, Skeleton } from '../../components/ui';
 import { home, menu, promo } from '../../lib/api';
 import { useMenu, useFavorites } from '../../hooks/useMenu';
@@ -157,6 +158,16 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      {/* Convite para ligar os avisos, na PRIMEIRA tela.
+          No Perfil ele existia, mas muita gente nunca abre o Perfil — e aí
+          faz o pedido e não recebe aviso nenhum do andamento. Aqui aparece
+          para quem ainda não ligou e some sozinho depois de ligado. */}
+      {user && (
+        <div className="mt-4 px-4">
+          <AvisosDoPedido userId={user.id} compacto />
+        </div>
+      )}
 
       {/* Banners */}
       {banners.length > 0 && (

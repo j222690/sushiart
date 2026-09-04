@@ -31,7 +31,7 @@ import { useToast } from '../context/ToastContext';
  * diz o que fazer. Permissão do navegador e preferência de marketing são coisas
  * separadas — esta trata só da primeira.
  */
-export default function AvisosDoPedido({ userId }) {
+export default function AvisosDoPedido({ userId, compacto = false }) {
   const toast = useToast();
   const [ligado, setLigado] = useState(null); // null = ainda conferindo
   const [ocupado, setOcupado] = useState(false);
@@ -48,6 +48,12 @@ export default function AvisosDoPedido({ userId }) {
   // Navegador sem suporte ou app sem chave VAPID: não há o que oferecer, e um
   // botão que não funciona é pior que botão nenhum.
   if (!pushSupported() || !pushConfigured() || ligado === null) return null;
+
+  // Na home o card é um convite, não um controle: aparece só enquanto há o que
+  // oferecer e some assim que a pessoa liga. Deixá-lo lá depois de ligado
+  // ocuparia o topo do cardápio para sempre sem dizer nada de novo — e quem
+  // quiser desligar encontra o controle completo no Perfil.
+  if (compacto && (ligado || Notification.permission === 'denied')) return null;
 
   // -------------------------------------------------------------------------
   // iPhone fora da tela de início: o Safari aceita a permissão e não entrega
