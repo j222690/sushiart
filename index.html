@@ -25,6 +25,14 @@
       content="Delivery de sushi em Chapecó/SC. Combinados, temakis, hot rolls, niguiris e sashimis feitos na hora. Peça pelo site com entrega em 20 bairros ou retire no local. Pix, cartão e pagamento na entrega."
     />
     <link rel="canonical" href="https://www.sushiarts.online/" />
+
+    <!-- Verificação de domínio da Meta.
+         Precisa estar no HTML ESTÁTICO, dentro do <head>: a Meta lê o
+         código-fonte cru e não executa JavaScript. Posta por um componente
+         React ela nunca apareceria — o rastreador veria a página em branco.
+         Sem o domínio verificado a Meta aceita os eventos do Pixel e descarta
+         em silêncio, que foi o motivo de a Visão geral ficar zerada. -->
+    <meta name="facebook-domain-verification" content="vp5yu1bc3hubcyn52hlfribbgcy2w2" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
 
     <!-- Compartilhamento no WhatsApp e no Instagram, que é por onde delivery
