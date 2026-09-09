@@ -41,8 +41,11 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={api}>
       {children}
 
-      {/* Fica acima do bottom nav para não ser encoberto no celular */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[100] flex flex-col items-center gap-2 px-4">
+      {/* Fica acima do bottom nav E da barra flutuante do carrinho (quando ela
+          aparece), para não ser encoberto no celular. A barra do carrinho vai
+          de 72px até uns 128px do rodapé — por isso aqui precisa de mais
+          altura do que só o bottom nav sozinho exigiria. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-36 z-[100] flex flex-col items-center gap-2 px-4">
         {toasts.map((t) => {
           const tone = TONES[t.tone] ?? TONES.info;
           const Icon = tone.icon;
