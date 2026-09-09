@@ -136,13 +136,13 @@ export default function ClientLayout() {
             className="mx-auto flex w-full max-w-lg items-center gap-3 rounded-xl bg-vinho-500 px-4 py-3 shadow-raised transition-colors hover:bg-vinho-600"
           >
             <span className="relative">
-              <ShoppingBag size={20} className="text-cream" />
-              <span className="absolute -right-2 -top-2 grid h-4 min-w-4 place-items-center rounded-full bg-cream px-1 text-[10px] font-bold text-vinho-700">
+              <ShoppingBag size={20} className="text-white" />
+              <span className="absolute -right-2 -top-2 grid h-4 min-w-4 place-items-center rounded-full bg-white px-1 text-[10px] font-bold text-vinho-700">
                 {count}
               </span>
             </span>
-            <span className="flex-1 text-left text-sm font-semibold text-cream">Ver carrinho</span>
-            <span className="text-sm font-bold text-cream">{formatBRL(subtotal)}</span>
+            <span className="flex-1 text-left text-sm font-semibold text-white">Ver carrinho</span>
+            <span className="text-sm font-bold text-white">{formatBRL(subtotal)}</span>
           </button>
         </div>
       )}
