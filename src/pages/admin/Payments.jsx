@@ -1,238 +1,277 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Copy, Check, ExternalLink, ShieldCheck, RefreshCw, XCircle } from 'lucide-react';
-import { Button, Card, Spinner } from '../../components/ui';
-import Countdown from '../../components/Countdown';
-import { orders as ordersApi } from '../../lib/api';
-import { useRealtimeOrders } from '../../hooks/useRealtimeOrders';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import {
+  CreditCard, Link2, Unlink, CheckCircle2, AlertTriangle, ExternalLink, Pencil,
+} from 'lucide-react';
+import { Badge, Button, Card, Input, Sheet, Skeleton, Switch, Textarea } from '../../components/ui';
+import { adminSettings } from '../../lib/adminApi';
 import { useToast } from '../../context/ToastContext';
-import { formatBRL } from '../../lib/format';
+import { formatDateTime } from '../../lib/format';
 
 /**
- * Tela de pagamento de Pix e cartão.
+ * Painel → Pagamentos.
  *
- * A confirmação chega por webhook → o banco atualiza o pedido → o Realtime
- * empurra a mudança pra cá. O polling de 12s é só uma rede de segurança para
- * o caso do WebSocket cair no meio da conexão do celular.
+ * Duas coisas vivem aqui: a conta do Mercado Pago (de onde sai o link de
+ * conexão OAuth — sem ela conectada, as cobranças caem na conta do
+ * desenvolvedor) e o roteador de formas de pagamento (o que aparece ligado
+ * ou desligado no checkout do cliente).
+ *
+ * Esta tela existiu por um bom tempo com o conteúdo ERRADO: era uma cópia da
+ * tela de pagamento do cliente (Pix, "Pagar agora"...), que só fazia sentido
+ * com um pedido de verdade na URL. Como a rota do painel não tem
+ * `:orderId`, ela sempre caía em "Não conseguimos iniciar o pagamento".
  */
-export default function Payment() {
-  const { orderId } = useParams();
-  const navigate = useNavigate();
+export default function AdminPayments() {
   const toast = useToast();
+  const [params, setParams] = useSearchParams();
 
-  const [order, setOrder] = useState(null);
-  const [charge, setCharge] = useState(null);
-  const [starting, setStarting] = useState(true);
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState(null);
-  const startedRef = useRef(false);
+  const [methods, setMethods] = useState(null);
+  const [mpStatus, setMpStatus] = useState(null);
+  const [connecting, setConnecting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [editSheet, setEditSheet] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      const fresh = await ordersApi.get(orderId);
-      setOrder(fresh);
-      return fresh;
-    } catch (e) {
-      setError(e.message);
-      return null;
+      const [rows, status] = await Promise.all([
+        adminSettings.paymentConfig(),
+        adminSettings.mercadoPagoStatus(),
+      ]);
+      setMethods(rows);
+      setMpStatus(status);
+    } catch (error) {
+      toast.error(error.message);
+      setMethods([]);
     }
-  }, [orderId]);
-
-  // Cria a cobrança no gateway uma única vez (StrictMode chama o efeito 2x).
-  useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-
-    (async () => {
-      const fresh = await refresh();
-      if (!fresh) {
-        setStarting(false);
-        return;
-      }
-
-      if (fresh.payment_status === 'pago') {
-        navigate(`/pedidos/${orderId}`, { replace: true });
-        return;
-      }
-
-      try {
-        const result = await ordersApi.startPayment(orderId);
-        setCharge(result);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setStarting(false);
-      }
-    })();
-  }, [orderId, refresh, navigate]);
-
-  const handleRealtime = useCallback(
-    (row) => {
-      setOrder((current) => ({ ...current, ...row }));
-      if (row.payment_status === 'pago') {
-        toast.success('Pagamento confirmado!');
-        navigate(`/pedidos/${orderId}`, { replace: true });
-      }
-    },
-    [navigate, orderId, toast]
-  );
-
-  useRealtimeOrders({ orderId, onChange: handleRealtime });
+  }, [toast]);
 
   useEffect(() => {
-    const timer = setInterval(async () => {
-      const fresh = await refresh();
-      if (fresh?.payment_status === 'pago') {
-        clearInterval(timer);
-        navigate(`/pedidos/${orderId}`, { replace: true });
-      }
-    }, 12_000);
-    return () => clearInterval(timer);
-  }, [refresh, navigate, orderId]);
+    load();
+  }, [load]);
 
-  function copyPix() {
-    const code = charge?.pix_code || order?.payment_payload?.pix_code;
-    if (!code) return;
-    navigator.clipboard?.writeText(code).then(
-      () => {
-        setCopied(true);
-        toast.success('Código Pix copiado.');
-        setTimeout(() => setCopied(false), 4000);
-      },
-      () => toast.error('Não foi possível copiar. Selecione o código manualmente.')
-    );
+  // Volta do OAuth do Mercado Pago: ?mp=conectado ou ?mp=erro&mensagem=...
+  useEffect(() => {
+    const mp = params.get('mp');
+    if (!mp) return;
+    if (mp === 'conectado') toast.success('Conta do Mercado Pago conectada.');
+    else toast.error(params.get('mensagem') || 'Não foi possível conectar ao Mercado Pago.');
+    setParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function connect() {
+    setConnecting(true);
+    try {
+      const url = await adminSettings.mercadoPagoConnectUrl();
+      window.location.href = url;
+    } catch (error) {
+      toast.error(error.message);
+      setConnecting(false);
+    }
   }
 
-  if (starting || !order) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-24">
-        <Spinner />
-        <p className="text-sm text-cream-muted">Preparando seu pagamento...</p>
-      </div>
-    );
+  async function disconnect() {
+    if (!window.confirm('Desconectar a conta do Mercado Pago? As cobranças voltam a usar a conta padrão.')) {
+      return;
+    }
+    setDisconnecting(true);
+    try {
+      await adminSettings.mercadoPagoDisconnect();
+      toast.success('Conta desconectada.');
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setDisconnecting(false);
+    }
   }
 
-  const pixCode = charge?.pix_code || order.payment_payload?.pix_code;
-  const qrImage = charge?.qr_code_base64 || order.payment_payload?.qr_code_base64;
-  const checkoutUrl = charge?.checkout_url || order.payment_url;
-  const expiresAt = charge?.expires_at || order.payment_payload?.expires_at;
+  async function toggleActive(method, value) {
+    setMethods((current) =>
+      current.map((m) => (m.method === method.method ? { ...m, is_active: value } : m))
+    );
+    try {
+      await adminSettings.savePaymentConfig(method.method, { is_active: value });
+    } catch (error) {
+      toast.error(error.message);
+      // Desfaz o toggle otimista se o servidor recusou.
+      setMethods((current) =>
+        current.map((m) => (m.method === method.method ? { ...m, is_active: !value } : m))
+      );
+    }
+  }
+
+  function openEdit(method) {
+    setEditForm({ label: method.label, description: method.description ?? '' });
+    setEditSheet(method);
+  }
+
+  async function saveEdit() {
+    if (!editForm.label?.trim()) return toast.error('Informe o nome exibido ao cliente.');
+    setSaving(true);
+    try {
+      await adminSettings.savePaymentConfig(editSheet.method, {
+        label: editForm.label.trim(),
+        description: editForm.description?.trim() || null,
+      });
+      toast.success('Forma de pagamento atualizada.');
+      setEditSheet(null);
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const expired = mpStatus?.connected && mpStatus.expired;
 
   return (
-    <div className="px-4 pb-8 pt-6">
-      <header className="mb-5 text-center">
-        <p className="text-xs uppercase tracking-widest text-cream-faint">Pedido {order.code}</p>
-        <h1 className="mt-1 font-brand text-2xl text-cream">
-          {order.payment_method === 'pix' ? 'Pague com Pix' : 'Pagamento no cartão'}
-        </h1>
-        <p className="mt-1 text-3xl font-extrabold text-cream">{formatBRL(order.total_cents)}</p>
-        {expiresAt && (
-          <div className="mt-2 flex justify-center">
-            <Countdown endsAt={expiresAt} onExpire={refresh} />
-          </div>
-        )}
+    <div>
+      <header className="mb-5">
+        <h1 className="font-brand text-2xl text-cream">Pagamentos</h1>
+        <p className="text-sm text-cream-muted">Conta do Mercado Pago e formas de pagamento do checkout.</p>
       </header>
 
-      {error && (
-        <Card className="mb-4 flex items-start gap-3 border-danger/40 bg-danger/10 p-4">
-          <XCircle size={18} className="mt-0.5 shrink-0 text-danger" />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-cream">Não conseguimos iniciar o pagamento</p>
-            <p className="mt-0.5 text-xs text-cream-muted">{error}</p>
-            <Button
-              size="sm"
-              variant="secondary"
-              className="mt-3"
-              onClick={() => {
-                setError(null);
-                setStarting(true);
-                startedRef.current = false;
-                window.location.reload();
-              }}
-            >
-              <RefreshCw size={14} /> Tentar de novo
-            </Button>
-          </div>
-        </Card>
-      )}
+      {/* ----------------------------- Mercado Pago ----------------------------- */}
+      <Card className="mb-6 p-5">
+        <div className="flex items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-vinho-50 text-vinho">
+            <CreditCard size={20} />
+          </span>
 
-      {/* Pix */}
-      {order.payment_method === 'pix' && (pixCode || qrImage) && (
-        <Card className="p-5">
-          {qrImage && (
-            <img
-              src={qrImage.startsWith('data:') ? qrImage : `data:image/png;base64,${qrImage}`}
-              alt="QR Code do Pix"
-              className="mx-auto mb-4 h-52 w-52 rounded-xl bg-white p-2"
-            />
-          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-brand text-lg text-cream">Conta do Mercado Pago</h2>
+              {mpStatus === null ? null : mpStatus.connected ? (
+                expired ? (
+                  <Badge tone="danger">Conexão expirada</Badge>
+                ) : (
+                  <Badge tone="success">Conectada</Badge>
+                )
+              ) : (
+                <Badge tone="neutral">Não conectada</Badge>
+              )}
+            </div>
 
-          <p className="mb-2 text-center text-xs text-cream-muted">
-            Escaneie o QR Code ou use o Pix copia e cola:
-          </p>
-
-          {pixCode && (
-            <>
-              <p className="max-h-24 overflow-y-auto break-all rounded-xl bg-ink-300 p-3 font-mono text-[11px] leading-relaxed text-cream-muted">
-                {pixCode}
+            {mpStatus === null ? (
+              <Skeleton className="mt-2 h-4 w-48" />
+            ) : mpStatus.connected ? (
+              <>
+                <p className="mt-1 text-sm text-cream-muted">
+                  {mpStatus.nickname || mpStatus.email || 'Conta conectada'}
+                </p>
+                <p className="mt-0.5 text-xs text-cream-faint">
+                  Conectada em {formatDateTime(mpStatus.connected_at)}
+                  {mpStatus.expires_at && ` · válida até ${formatDateTime(mpStatus.expires_at)}`}
+                </p>
+                {expired && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-danger">
+                    <AlertTriangle size={13} />
+                    A conexão expirou — conecte de novo para as cobranças continuarem caindo na sua conta.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-cream-muted">
+                Sem conta conectada, as cobranças caem na conta padrão do sistema, não na sua. Conecte
+                para o dinheiro cair direto na sua conta do Mercado Pago.
               </p>
-              <Button className="mt-3 w-full" onClick={copyPix}>
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-                {copied ? 'Código copiado' : 'Copiar código Pix'}
+            )}
+
+            <div className="mt-3 flex gap-2">
+              {mpStatus?.connected ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="text-danger"
+                  loading={disconnecting}
+                  onClick={disconnect}
+                >
+                  <Unlink size={14} /> Desconectar
+                </Button>
+              ) : (
+                <Button size="sm" loading={connecting} onClick={connect} disabled={mpStatus === null}>
+                  <Link2 size={14} /> Conectar conta
+                  <ExternalLink size={13} />
+                </Button>
+              )}
+              {expired && (
+                <Button size="sm" loading={connecting} onClick={connect}>
+                  <Link2 size={14} /> Conectar de novo
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* ------------------------------- Métodos -------------------------------- */}
+      <h2 className="mb-3 font-brand text-lg text-cream">Formas de pagamento no checkout</h2>
+
+      {methods === null ? (
+        <div className="space-y-2">
+          <Skeleton className="h-20" />
+          <Skeleton className="h-20" />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {methods.map((method) => (
+            <Card key={method.method} className="flex flex-wrap items-center gap-3 p-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-cream">{method.label}</p>
+                  <Badge tone="neutral">{method.provider}</Badge>
+                  {!method.is_active && <Badge tone="danger">Desligado</Badge>}
+                </div>
+                {method.description && (
+                  <p className="mt-0.5 text-xs text-cream-muted">{method.description}</p>
+                )}
+              </div>
+
+              <Button size="sm" variant="ghost" onClick={() => openEdit(method)}>
+                <Pencil size={15} />
               </Button>
-            </>
-          )}
-        </Card>
+
+              <Switch checked={method.is_active} onChange={(v) => toggleActive(method, v)} />
+            </Card>
+          ))}
+        </div>
       )}
 
-      {/* Cartão / checkout externo */}
-      {checkoutUrl && order.payment_method !== 'pix' && (
-        <Card className="p-5 text-center">
-          <ShieldCheck size={30} className="mx-auto mb-3 text-success" />
-          <p className="text-sm text-cream-muted">
-            Você será levado ao ambiente seguro do nosso processador de pagamento para informar os
-            dados do cartão. Nós não armazenamos o número do seu cartão.
-          </p>
-          <Button
-            size="lg"
-            className="mt-4 w-full"
-            onClick={() => {
-              window.location.href = checkoutUrl;
-            }}
-          >
-            <ExternalLink size={17} /> Pagar agora
+      <Sheet
+        open={Boolean(editSheet)}
+        onClose={() => setEditSheet(null)}
+        title="Editar forma de pagamento"
+        footer={
+          <Button className="w-full" loading={saving} onClick={saveEdit}>
+            Salvar
           </Button>
-        </Card>
-      )}
-
-      <div className="mt-5 flex items-center justify-center gap-2 text-xs text-cream-faint">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-vinho-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-vinho-500" />
-        </span>
-        Aguardando confirmação — esta tela muda sozinha.
-      </div>
-
-      <Button variant="ghost" className="mt-6 w-full" onClick={() => navigate(`/pedidos/${orderId}`)}>
-        Ver detalhes do pedido
-      </Button>
-
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mt-1 w-full text-cream-faint"
-        onClick={async () => {
-          if (!window.confirm('Cancelar este pedido?')) return;
-          try {
-            await ordersApi.cancel(orderId, 'Cancelado pelo cliente antes do pagamento');
-            toast.info('Pedido cancelado.');
-            navigate('/pedidos', { replace: true });
-          } catch (e) {
-            toast.error(e.message);
-          }
-        }}
+        }
       >
-        Cancelar pedido
-      </Button>
+        <div className="space-y-4">
+          <Input
+            label="Nome exibido ao cliente"
+            value={editForm.label ?? ''}
+            onChange={(e) => setEditForm((c) => ({ ...c, label: e.target.value }))}
+          />
+          <Textarea
+            label="Descrição (opcional)"
+            value={editForm.description ?? ''}
+            onChange={(e) => setEditForm((c) => ({ ...c, description: e.target.value }))}
+            rows={2}
+          />
+        </div>
+      </Sheet>
+
+      <p className="mt-4 flex items-start gap-1.5 text-xs text-cream-faint">
+        <CheckCircle2 size={13} className="mt-0.5 shrink-0" />
+        Formas de pagamento sem integração pronta (cartão via Mercado Pago/PagBank, por exemplo) devem
+        ficar desligadas até o processamento estar configurado — senão o cliente chega ao fim do
+        checkout e a cobrança não completa.
+      </p>
     </div>
   );
 }
