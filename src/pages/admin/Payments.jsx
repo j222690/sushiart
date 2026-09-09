@@ -1,380 +1,238 @@
-import { useCallback, useEffect, useState } from 'react';
-import { QrCode, CreditCard, Banknote, ShieldCheck, AlertTriangle, Info } from 'lucide-react';
-import clsx from 'clsx';
-import { Badge, Button, Card, Input, Select, Skeleton, Switch } from '../../components/ui';
-import ContaMercadoPago from '../../components/admin/ContaMercadoPago';
-import { adminSettings } from '../../lib/adminApi';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Copy, Check, ExternalLink, ShieldCheck, RefreshCw, XCircle } from 'lucide-react';
+import { Button, Card, Spinner } from '../../components/ui';
+import Countdown from '../../components/Countdown';
+import { orders as ordersApi } from '../../lib/api';
+import { useRealtimeOrders } from '../../hooks/useRealtimeOrders';
 import { useToast } from '../../context/ToastContext';
-import { PAYMENT_PROVIDERS, ON_DELIVERY_KINDS } from '../../lib/constants';
-
-const METHOD_META = {
-  pix: { label: 'Pix', icon: QrCode, hint: 'Confirmação automática por webhook.' },
-  cartao_credito: {
-    label: 'Cartão de crédito',
-    icon: CreditCard,
-    hint: 'Checkout do gateway, com confirmação por webhook.',
-  },
-  cartao_debito: {
-    label: 'Cartão de débito',
-    icon: CreditCard,
-    hint: 'Débito à vista, com confirmação por webhook.',
-  },
-  na_entrega: {
-    label: 'Pagar na entrega',
-    icon: Banknote,
-    hint: 'Sem gateway: dinheiro, maquininha ou Pix direto com o entregador.',
-  },
-};
+import { formatBRL } from '../../lib/format';
 
 /**
- * Roteador de pagamentos.
+ * Tela de pagamento de Pix e cartão.
  *
- * Cada método aponta para um provedor. Trocar de gateway no futuro é mudar o
- * `provider` aqui — o app do cliente não muda, porque ele só conhece "Pix",
- * "Cartão" e "Dinheiro". As chaves de API NÃO ficam nesta tela nem no banco:
- * vivem nos secrets das Edge Functions.
+ * A confirmação chega por webhook → o banco atualiza o pedido → o Realtime
+ * empurra a mudança pra cá. O polling de 12s é só uma rede de segurança para
+ * o caso do WebSocket cair no meio da conexão do celular.
  */
-export default function Payments() {
+export default function Payment() {
+  const { orderId } = useParams();
+  const navigate = useNavigate();
   const toast = useToast();
-  const [rows, setRows] = useState(null);
-  const [saving, setSaving] = useState(null);
 
-  const load = useCallback(async () => {
+  const [order, setOrder] = useState(null);
+  const [charge, setCharge] = useState(null);
+  const [starting, setStarting] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(null);
+  const startedRef = useRef(false);
+
+  const refresh = useCallback(async () => {
     try {
-      setRows(await adminSettings.paymentConfig());
-    } catch (error) {
-      toast.error(error.message);
-      setRows([]);
+      const fresh = await ordersApi.get(orderId);
+      setOrder(fresh);
+      return fresh;
+    } catch (e) {
+      setError(e.message);
+      return null;
     }
-  }, [toast]);
+  }, [orderId]);
+
+  // Cria a cobrança no gateway uma única vez (StrictMode chama o efeito 2x).
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    (async () => {
+      const fresh = await refresh();
+      if (!fresh) {
+        setStarting(false);
+        return;
+      }
+
+      if (fresh.payment_status === 'pago') {
+        navigate(`/pedidos/${orderId}`, { replace: true });
+        return;
+      }
+
+      try {
+        const result = await ordersApi.startPayment(orderId);
+        setCharge(result);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setStarting(false);
+      }
+    })();
+  }, [orderId, refresh, navigate]);
+
+  const handleRealtime = useCallback(
+    (row) => {
+      setOrder((current) => ({ ...current, ...row }));
+      if (row.payment_status === 'pago') {
+        toast.success('Pagamento confirmado!');
+        navigate(`/pedidos/${orderId}`, { replace: true });
+      }
+    },
+    [navigate, orderId, toast]
+  );
+
+  useRealtimeOrders({ orderId, onChange: handleRealtime });
 
   useEffect(() => {
-    load();
-  }, [load]);
+    const timer = setInterval(async () => {
+      const fresh = await refresh();
+      if (fresh?.payment_status === 'pago') {
+        clearInterval(timer);
+        navigate(`/pedidos/${orderId}`, { replace: true });
+      }
+    }, 12_000);
+    return () => clearInterval(timer);
+  }, [refresh, navigate, orderId]);
 
-  async function save(method, patch) {
-    const row = rows.find((r) => r.method === method);
-    const provider = patch.provider ?? row?.provider;
-
-    // Barreira: ativar um método cujo gateway ainda não tem adapter jogaria o
-    // cliente num checkout que nunca completa. Melhor recusar aqui.
-    if (patch.is_active === true && PAYMENT_PROVIDERS[provider]?.implemented === false) {
-      toast.error(
-        `${PAYMENT_PROVIDERS[provider].label} ainda não tem integração escrita. ` +
-          'Peça o adapter antes de ativar este método.'
-      );
-      return;
-    }
-
-    setSaving(method);
-    setRows((current) => current.map((r) => (r.method === method ? { ...r, ...patch } : r)));
-    try {
-      await adminSettings.savePaymentConfig(method, patch);
-      toast.success('Configuração salva.');
-    } catch (error) {
-      toast.error(error.message);
-      await load();
-    } finally {
-      setSaving(null);
-    }
+  function copyPix() {
+    const code = charge?.pix_code || order?.payment_payload?.pix_code;
+    if (!code) return;
+    navigator.clipboard?.writeText(code).then(
+      () => {
+        setCopied(true);
+        toast.success('Código Pix copiado.');
+        setTimeout(() => setCopied(false), 4000);
+      },
+      () => toast.error('Não foi possível copiar. Selecione o código manualmente.')
+    );
   }
 
-  if (rows === null) {
+  if (starting || !order) {
     return (
-      <div className="space-y-3">
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
+      <div className="flex flex-col items-center gap-3 py-24">
+        <Spinner />
+        <p className="text-sm text-cream-muted">Preparando seu pagamento...</p>
       </div>
     );
   }
 
-  const noneActive = rows.every((r) => !r.is_active);
+  const pixCode = charge?.pix_code || order.payment_payload?.pix_code;
+  const qrImage = charge?.qr_code_base64 || order.payment_payload?.qr_code_base64;
+  const checkoutUrl = charge?.checkout_url || order.payment_url;
+  const expiresAt = charge?.expires_at || order.payment_payload?.expires_at;
 
   return (
-    <div>
-      <header className="mb-5">
-        <h1 className="font-brand text-2xl text-cream">Pagamentos</h1>
-        <p className="text-sm text-cream-muted">
-          Escolha qual gateway atende cada forma de pagamento.
-        </p>
+    <div className="px-4 pb-8 pt-6">
+      <header className="mb-5 text-center">
+        <p className="text-xs uppercase tracking-widest text-cream-faint">Pedido {order.code}</p>
+        <h1 className="mt-1 font-brand text-2xl text-cream">
+          {order.payment_method === 'pix' ? 'Pague com Pix' : 'Pagamento no cartão'}
+        </h1>
+        <p className="mt-1 text-3xl font-extrabold text-cream">{formatBRL(order.total_cents)}</p>
+        {expiresAt && (
+          <div className="mt-2 flex justify-center">
+            <Countdown endsAt={expiresAt} onExpire={refresh} />
+          </div>
+        )}
       </header>
 
-      {/* Antes de tudo: para onde o dinheiro vai. Qualquer outra configuração
-          desta tela é detalhe perto disso. */}
-      <ContaMercadoPago />
-
-      {noneActive && (
+      {error && (
         <Card className="mb-4 flex items-start gap-3 border-danger/40 bg-danger/10 p-4">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-danger" />
-          <p className="text-sm text-cream">
-            Nenhuma forma de pagamento está ativa — o cliente não consegue fechar pedido.
-          </p>
+          <XCircle size={18} className="mt-0.5 shrink-0 text-danger" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-cream">Não conseguimos iniciar o pagamento</p>
+            <p className="mt-0.5 text-xs text-cream-muted">{error}</p>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="mt-3"
+              onClick={() => {
+                setError(null);
+                setStarting(true);
+                startedRef.current = false;
+                window.location.reload();
+              }}
+            >
+              <RefreshCw size={14} /> Tentar de novo
+            </Button>
+          </div>
         </Card>
       )}
 
-      <div className="space-y-3">
-        {rows.map((row) => {
-          const meta = METHOD_META[row.method];
-          const Icon = meta?.icon ?? CreditCard;
-          const compatible = Object.entries(PAYMENT_PROVIDERS).filter(([, p]) =>
-            p.methods.includes(row.method)
-          );
+      {/* Pix */}
+      {order.payment_method === 'pix' && (pixCode || qrImage) && (
+        <Card className="p-5">
+          {qrImage && (
+            <img
+              src={qrImage.startsWith('data:') ? qrImage : `data:image/png;base64,${qrImage}`}
+              alt="QR Code do Pix"
+              className="mx-auto mb-4 h-52 w-52 rounded-xl bg-white p-2"
+            />
+          )}
 
-          return (
-            <Card key={row.method} className={clsx('p-4', !row.is_active && 'opacity-70')}>
-              <div className="flex flex-wrap items-center gap-3">
-                <span
-                  className={clsx(
-                    'grid h-11 w-11 shrink-0 place-items-center rounded-xl',
-                    row.is_active ? 'bg-vinho-gradient text-white' : 'bg-ink-300 text-cream-faint'
-                  )}
-                >
-                  <Icon size={20} />
-                </span>
+          <p className="mb-2 text-center text-xs text-cream-muted">
+            Escaneie o QR Code ou use o Pix copia e cola:
+          </p>
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-cream">{meta?.label ?? row.method}</p>
-                    <Badge tone={row.is_active ? 'success' : 'neutral'}>
-                      {row.is_active ? '● Ativo' : '○ Inativo'}
-                    </Badge>
-                    <Badge tone="info">{PAYMENT_PROVIDERS[row.provider]?.label ?? row.provider}</Badge>
-                    {PAYMENT_PROVIDERS[row.provider]?.implemented === false && (
-                      <Badge tone="warning">Sem integração</Badge>
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-xs text-cream-faint">{meta?.hint}</p>
-                  {PAYMENT_PROVIDERS[row.provider]?.implemented === false && (
-                    <p className="mt-1 text-xs text-warning">
-                      O adapter de {PAYMENT_PROVIDERS[row.provider].label} ainda não foi escrito —
-                      este método não pode ser ativado até isso ser feito.
-                    </p>
-                  )}
-                </div>
+          {pixCode && (
+            <>
+              <p className="max-h-24 overflow-y-auto break-all rounded-xl bg-ink-300 p-3 font-mono text-[11px] leading-relaxed text-cream-muted">
+                {pixCode}
+              </p>
+              <Button className="mt-3 w-full" onClick={copyPix}>
+                {copied ? <Check size={16} /> : <Copy size={16} />}
+                {copied ? 'Código copiado' : 'Copiar código Pix'}
+              </Button>
+            </>
+          )}
+        </Card>
+      )}
 
-                <div className="shrink-0">
-                  <Switch
-                    checked={row.is_active}
-                    disabled={saving === row.method}
-                    onChange={(v) => save(row.method, { is_active: v })}
-                    label=""
-                  />
-                </div>
-              </div>
+      {/* Cartão / checkout externo */}
+      {checkoutUrl && order.payment_method !== 'pix' && (
+        <Card className="p-5 text-center">
+          <ShieldCheck size={30} className="mx-auto mb-3 text-success" />
+          <p className="text-sm text-cream-muted">
+            Você será levado ao ambiente seguro do nosso processador de pagamento para informar os
+            dados do cartão. Nós não armazenamos o número do seu cartão.
+          </p>
+          <Button
+            size="lg"
+            className="mt-4 w-full"
+            onClick={() => {
+              window.location.href = checkoutUrl;
+            }}
+          >
+            <ExternalLink size={17} /> Pagar agora
+          </Button>
+        </Card>
+      )}
 
-              <div className="mt-4 grid gap-3 border-t border-line pt-4 md:grid-cols-2">
-                <Select
-                  label="Provedor"
-                  value={row.provider}
-                  disabled={row.method === 'na_entrega'}
-                  onChange={(e) => save(row.method, { provider: e.target.value })}
-                >
-                  {compatible.map(([value, provider]) => (
-                    <option key={value} value={value}>
-                      {provider.label} — {provider.note}
-                    </option>
-                  ))}
-                </Select>
-
-                <Input
-                  label="Como o cliente vê"
-                  defaultValue={row.label}
-                  onBlur={(e) => {
-                    if (e.target.value.trim() && e.target.value !== row.label) {
-                      save(row.method, { label: e.target.value.trim() });
-                    }
-                  }}
-                />
-
-                <Input
-                  className="md:col-span-2"
-                  label="Descrição no checkout"
-                  defaultValue={row.description ?? ''}
-                  onBlur={(e) => {
-                    if (e.target.value !== row.description) {
-                      save(row.method, { description: e.target.value.trim() || null });
-                    }
-                  }}
-                />
-
-                {/* Desconto por escolher esta forma.
-                    O Pix custa 0,99% e o débito 3,99%: um desconto pequeno no
-                    Pix ainda deixa o restaurante na frente e treina o cliente
-                    a escolher a forma que sangra menos. Aparece como selo no
-                    checkout e sai do total, calculado no servidor. */}
-                <Input
-                  label="Desconto para o cliente (%)"
-                  type="number"
-                  min={0}
-                  max={20}
-                  step="0.5"
-                  defaultValue={Number(row.discount_percent ?? 0)}
-                  hint={
-                    row.method === 'pix'
-                      ? 'O Pix é a forma mais barata para a casa — vale incentivar.'
-                      : '0 = sem desconto.'
-                  }
-                  onBlur={(e) => {
-                    const valor = Math.min(20, Math.max(0, Number(e.target.value) || 0));
-                    if (valor !== Number(row.discount_percent ?? 0)) {
-                      save(row.method, { discount_percent: valor });
-                    }
-                  }}
-                />
-
-                {row.method === 'cartao_credito' && (
-                  <>
-                    <Input
-                      label="Máximo de parcelas"
-                      type="number"
-                      min={1}
-                      max={12}
-                      defaultValue={row.options?.max_installments ?? 3}
-                      onBlur={(e) =>
-                        save(row.method, {
-                          options: {
-                            ...row.options,
-                            max_installments: Math.max(1, Number(e.target.value) || 1),
-                          },
-                        })
-                      }
-                    />
-                    <Input
-                      label="Parcela mínima (R$)"
-                      type="number"
-                      min={1}
-                      defaultValue={(row.options?.min_installment_cents ?? 2000) / 100}
-                      onBlur={(e) =>
-                        save(row.method, {
-                          options: {
-                            ...row.options,
-                            min_installment_cents: Math.round((Number(e.target.value) || 20) * 100),
-                          },
-                        })
-                      }
-                      hint="Abaixo disso, a opção de parcela some do checkout."
-                    />
-                  </>
-                )}
-
-                {row.method === 'pix' && (
-                  <Input
-                    label="Expiração do Pix (minutos)"
-                    type="number"
-                    min={5}
-                    defaultValue={row.options?.expires_minutes ?? 30}
-                    onBlur={(e) =>
-                      save(row.method, {
-                        options: {
-                          ...row.options,
-                          expires_minutes: Math.max(5, Number(e.target.value) || 30),
-                        },
-                      })
-                    }
-                  />
-                )}
-
-                {row.method === 'na_entrega' && (
-                  <div className="space-y-3 rounded-xl border border-line bg-ink-300 p-3.5 md:col-span-2">
-                    <p className="text-xs font-semibold text-cream">
-                      Formas aceitas na entrega
-                    </p>
-
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(ON_DELIVERY_KINDS).map(([key, kind]) => {
-                        const enabled = (row.options?.kinds ?? []).includes(key);
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => {
-                              const current = row.options?.kinds ?? [];
-                              const next = enabled
-                                ? current.filter((k) => k !== key)
-                                : [...current, key];
-                              if (next.length === 0) {
-                                toast.error('Deixe ao menos uma forma de pagamento na entrega.');
-                                return;
-                              }
-                              save(row.method, { options: { ...row.options, kinds: next } });
-                            }}
-                            className={clsx(
-                              'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-                              enabled
-                                ? 'border-vinho-500 bg-vinho-900/40 text-cream'
-                                : 'border-line bg-ink-500 text-cream-faint'
-                            )}
-                          >
-                            {kind.badge}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <p className="text-[11px] text-cream-faint">
-                      Crédito e débito na entrega exigem maquininha — a comanda avisa o entregador.
-                    </p>
-
-                    <Switch
-                      checked={row.options?.ask_change ?? true}
-                      onChange={(v) =>
-                        save(row.method, { options: { ...row.options, ask_change: v } })
-                      }
-                      label="Perguntar sobre troco"
-                      description='Mostra o campo "precisa de troco para quanto?" quando for dinheiro'
-                    />
-                  </div>
-                )}
-              </div>
-            </Card>
-          );
-        })}
+      <div className="mt-5 flex items-center justify-center gap-2 text-xs text-cream-faint">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-vinho-400 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-vinho-500" />
+        </span>
+        Aguardando confirmação — esta tela muda sozinha.
       </div>
 
-      {/* Onde ficam as chaves */}
-      <Card className="mt-5 p-4">
-        <h2 className="mb-2 flex items-center gap-2 font-brand text-lg text-cream">
-          <ShieldCheck size={17} className="text-success" /> Chaves de API
-        </h2>
-        <p className="text-sm text-cream-muted">
-          Por segurança, as chaves dos gateways não ficam nesta tela nem no banco de dados. Elas são
-          cadastradas como <em>secrets</em> das Edge Functions do Supabase:
-        </p>
+      <Button variant="ghost" className="mt-6 w-full" onClick={() => navigate(`/pedidos/${orderId}`)}>
+        Ver detalhes do pedido
+      </Button>
 
-        <pre className="mt-3 overflow-x-auto rounded-xl bg-ink-800 p-3.5 text-[11px] leading-relaxed text-cream-muted">
-{`supabase secrets set \\
-  INFINITEPAY_API_KEY=...      # Pix
-  INFINITEPAY_HANDLE=...       # seu @handle na InfinitePay
-  INFINITEPAY_WEBHOOK_SECRET=...
-  ASAAS_API_KEY=...            # Cartão
-  ASAAS_WEBHOOK_TOKEN=...
-  ASAAS_ENV=sandbox            # ou production`}
-        </pre>
-
-        <div className="mt-3 flex items-start gap-2 rounded-xl border border-line bg-ink-300 p-3">
-          <Info size={15} className="mt-0.5 shrink-0 text-cream-faint" />
-          <p className="text-xs text-cream-faint">
-            Depois de trocar um provedor aqui, confirme que a URL de webhook correspondente está
-            cadastrada no painel do gateway — sem isso o pedido fica preso em “aguardando pagamento”.
-          </p>
-        </div>
-
-        <Button
-          variant="secondary"
-          size="sm"
-          className="mt-3"
-          onClick={() => {
-            const base = import.meta.env.VITE_SUPABASE_URL;
-            navigator.clipboard?.writeText(
-              `InfinitePay: ${base}/functions/v1/webhook-infinitepay\nAsaas: ${base}/functions/v1/webhook-asaas`
-            );
-            toast.success('URLs de webhook copiadas.');
-          }}
-        >
-          Copiar URLs de webhook
-        </Button>
-      </Card>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mt-1 w-full text-cream-faint"
+        onClick={async () => {
+          if (!window.confirm('Cancelar este pedido?')) return;
+          try {
+            await ordersApi.cancel(orderId, 'Cancelado pelo cliente antes do pagamento');
+            toast.info('Pedido cancelado.');
+            navigate('/pedidos', { replace: true });
+          } catch (e) {
+            toast.error(e.message);
+          }
+        }}
+      >
+        Cancelar pedido
+      </Button>
     </div>
   );
 }
