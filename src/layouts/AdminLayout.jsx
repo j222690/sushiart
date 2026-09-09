@@ -47,10 +47,16 @@ function SinoDePedidoNovo() {
   const { restaurant } = useStore();
   const [bloqueado, setBloqueado] = useState(false);
 
-  // Pedidos que a cozinha já conhece. Começa vazio e é preenchido na primeira
-  // conferência — sem isso, ao abrir o painel com dez pedidos na fila o sino
-  // tocaria dez vezes seguidas.
-  const conhecidos = useRef(null);
+  // Último status conhecido de cada pedido (Map<id, status>). Começa vazio e
+  // é preenchido na primeira conferência — sem isso, ao abrir o painel com
+  // dez pedidos na fila o sino tocaria dez vezes seguidas.
+  //
+  // É um Map de status, não um Set de ids, porque pedido com pagamento
+  // pendente (Pix/cartão criado, esperando o gateway confirmar) precisa
+  // ENTRAR na fila sem anunciar nada — e só anunciar depois, no momento em
+  // que o pagamento for confirmado e o status mudar. Um Set só diria "já vi
+  // esse id", que dispararia o anúncio cedo demais.
+  const statusConhecido = useRef(null);
 
   // O navegador libera áudio no primeiro toque da pessoa. Enquanto isso não
   // acontece, o painel avisa — em vez de ficar mudo esperando alguém descobrir
@@ -79,13 +85,50 @@ function SinoDePedidoNovo() {
       if (impressaoAutomatica()) {
         adminOrders
           .get(id)
-          .then((completo) => imprimirComanda(completo, restaurant))
+          .then((completo) => {
+            const resultado = imprimirComanda(completo, restaurant);
+            // window.open pode ser bloqueado pelo navegador (ex: pop-up sem
+            // permissão fixa) sem lançar erro nenhum — sem este checagem,
+            // a comanda falha e ninguém no balcão fica sabendo.
+            if (!resultado.ok) {
+              toast.error(
+                `Não consegui imprimir a comanda do ${code} (${resultado.motivo}). Imprima pelo pedido.`
+              );
+            }
+          })
           .catch(() => {
             toast.error(`Não consegui imprimir a comanda do ${code}. Imprima pelo pedido.`);
           });
       }
     },
     [toast, restaurant]
+  );
+
+  /**
+   * Decide se ESTE pedido, NESTE status, deve anunciar — e atualiza o que a
+   * gente sabe dele.
+   *
+   * A regra: anuncia só na transição pra um status que já vale pra cozinha
+   * (tudo em ACTIVE_STATUSES exceto `aguardando_pagamento`). Isso cobre os
+   * dois casos de uma vez: pedido pago na entrega/retirada, que já nasce
+   * nesse status e anuncia na hora; e Pix/cartão, que nasce em
+   * `aguardando_pagamento` (não anuncia nada) e só anuncia quando o webhook
+   * confirma e o status muda pra `pago`. Depois disso, mudanças de status
+   * seguintes (em_preparo, saiu_para_entrega…) não anunciam de novo.
+   */
+  const avaliar = useCallback(
+    (id, code, status) => {
+      const anterior = statusConhecido.current.get(id);
+      statusConhecido.current.set(id, status);
+
+      const jaValiaCozinha = anterior !== undefined && anterior !== 'aguardando_pagamento';
+      const agoraValeCozinha = status !== 'aguardando_pagamento';
+
+      if (agoraValeCozinha && !jaValiaCozinha) {
+        anunciar(id, code);
+      }
+    },
+    [anunciar]
   );
 
   /**
@@ -99,39 +142,39 @@ function SinoDePedidoNovo() {
     try {
       const abertos = await adminOrders.list({ statuses: ACTIVE_STATUSES, limit: 40 });
 
-      // Primeira passada só memoriza: o que já estava na fila quando o painel
-      // abriu não é novidade.
-      if (conhecidos.current === null) {
-        conhecidos.current = new Set(abertos.map((o) => o.id));
+      // Primeira passada só memoriza o status de cada um: o que já estava na
+      // fila quando o painel abriu não é novidade — mas se algum deles
+      // estiver aguardando pagamento, fica registrado como tal, e a
+      // confirmação futura ainda vai anunciar normalmente.
+      if (statusConhecido.current === null) {
+        statusConhecido.current = new Map(abertos.map((o) => [o.id, o.status]));
         return;
       }
 
       for (const pedido of abertos) {
-        if (conhecidos.current.has(pedido.id)) continue;
-        conhecidos.current.add(pedido.id);
-        anunciar(pedido.id, pedido.code);
+        avaliar(pedido.id, pedido.code, pedido.status);
       }
     } catch {
       // Falha de rede numa conferência não merece alarde: a próxima acontece
       // em segundos, e o tempo real pode ter pegado antes.
     }
-  }, [anunciar]);
+  }, [avaliar]);
 
   const aoMudar = useCallback(
     (linha, evento) => {
-      // O tempo real trouxe um pedido novo: anuncia na hora, sem esperar a
-      // próxima conferência.
-      if (evento === 'INSERT' && linha?.id) {
-        if (conhecidos.current === null) conhecidos.current = new Set();
-        if (conhecidos.current.has(linha.id)) return;
-        conhecidos.current.add(linha.id);
-        anunciar(linha.id, linha.code);
+      // O tempo real trouxe uma criação ou mudança de status: avalia na hora,
+      // sem esperar a próxima conferência. UPDATE entra aqui também porque é
+      // assim que a confirmação de pagamento (aguardando_pagamento → pago)
+      // chega — é exatamente o evento que precisa anunciar.
+      if ((evento === 'INSERT' || evento === 'UPDATE') && linha?.id) {
+        if (statusConhecido.current === null) statusConhecido.current = new Map();
+        avaliar(linha.id, linha.code, linha.status);
         return;
       }
       // Qualquer outra coisa (inclusive a conferência periódica): olha a fila.
       conferirFila();
     },
-    [anunciar, conferirFila]
+    [avaliar, conferirFila]
   );
 
   useRealtimeOrders({ onChange: aoMudar, pollMs: 10000 });
