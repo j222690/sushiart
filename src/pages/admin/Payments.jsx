@@ -1,49 +1,50 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import {
-  CreditCard, Link2, Unlink, CheckCircle2, AlertTriangle, ExternalLink, Pencil,
-} from 'lucide-react';
-import { Badge, Button, Card, Input, Sheet, Skeleton, Switch, Textarea } from '../../components/ui';
+import { QrCode, CreditCard, Banknote, ShieldCheck, AlertTriangle, Info } from 'lucide-react';
+import clsx from 'clsx';
+import { Badge, Button, Card, Input, Select, Skeleton, Switch } from '../../components/ui';
+import ContaMercadoPago from '../../components/admin/ContaMercadoPago';
 import { adminSettings } from '../../lib/adminApi';
 import { useToast } from '../../context/ToastContext';
-import { formatDateTime } from '../../lib/format';
+import { PAYMENT_PROVIDERS, ON_DELIVERY_KINDS } from '../../lib/constants';
+
+const METHOD_META = {
+  pix: { label: 'Pix', icon: QrCode, hint: 'Confirmação automática por webhook.' },
+  cartao_credito: {
+    label: 'Cartão de crédito',
+    icon: CreditCard,
+    hint: 'Checkout do gateway, com confirmação por webhook.',
+  },
+  cartao_debito: {
+    label: 'Cartão de débito',
+    icon: CreditCard,
+    hint: 'Débito à vista, com confirmação por webhook.',
+  },
+  na_entrega: {
+    label: 'Pagar na entrega',
+    icon: Banknote,
+    hint: 'Sem gateway: dinheiro, maquininha ou Pix direto com o entregador.',
+  },
+};
 
 /**
- * Painel → Pagamentos.
+ * Roteador de pagamentos.
  *
- * Duas coisas vivem aqui: a conta do Mercado Pago (de onde sai o link de
- * conexão OAuth — sem ela conectada, as cobranças caem na conta do
- * desenvolvedor) e o roteador de formas de pagamento (o que aparece ligado
- * ou desligado no checkout do cliente).
- *
- * Esta tela existiu por um bom tempo com o conteúdo ERRADO: era uma cópia da
- * tela de pagamento do cliente (Pix, "Pagar agora"...), que só fazia sentido
- * com um pedido de verdade na URL. Como a rota do painel não tem
- * `:orderId`, ela sempre caía em "Não conseguimos iniciar o pagamento".
+ * Cada método aponta para um provedor. Trocar de gateway no futuro é mudar o
+ * `provider` aqui — o app do cliente não muda, porque ele só conhece "Pix",
+ * "Cartão" e "Dinheiro". As chaves de API NÃO ficam nesta tela nem no banco:
+ * vivem nos secrets das Edge Functions.
  */
-export default function AdminPayments() {
+export default function Payments() {
   const toast = useToast();
-  const [params, setParams] = useSearchParams();
-
-  const [methods, setMethods] = useState(null);
-  const [mpStatus, setMpStatus] = useState(null);
-  const [connecting, setConnecting] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-  const [editSheet, setEditSheet] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [saving, setSaving] = useState(false);
+  const [rows, setRows] = useState(null);
+  const [saving, setSaving] = useState(null);
 
   const load = useCallback(async () => {
     try {
-      const [rows, status] = await Promise.all([
-        adminSettings.paymentConfig(),
-        adminSettings.mercadoPagoStatus(),
-      ]);
-      setMethods(rows);
-      setMpStatus(status);
+      setRows(await adminSettings.paymentConfig());
     } catch (error) {
       toast.error(error.message);
-      setMethods([]);
+      setRows([]);
     }
   }, [toast]);
 
@@ -51,227 +52,329 @@ export default function AdminPayments() {
     load();
   }, [load]);
 
-  // Volta do OAuth do Mercado Pago: ?mp=conectado ou ?mp=erro&mensagem=...
-  useEffect(() => {
-    const mp = params.get('mp');
-    if (!mp) return;
-    if (mp === 'conectado') toast.success('Conta do Mercado Pago conectada.');
-    else toast.error(params.get('mensagem') || 'Não foi possível conectar ao Mercado Pago.');
-    setParams({}, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  async function save(method, patch) {
+    const row = rows.find((r) => r.method === method);
+    const provider = patch.provider ?? row?.provider;
 
-  async function connect() {
-    setConnecting(true);
-    try {
-      const url = await adminSettings.mercadoPagoConnectUrl();
-      window.location.href = url;
-    } catch (error) {
-      toast.error(error.message);
-      setConnecting(false);
-    }
-  }
-
-  async function disconnect() {
-    if (!window.confirm('Desconectar a conta do Mercado Pago? As cobranças voltam a usar a conta padrão.')) {
+    // Barreira: ativar um método cujo gateway ainda não tem adapter jogaria o
+    // cliente num checkout que nunca completa. Melhor recusar aqui.
+    if (patch.is_active === true && PAYMENT_PROVIDERS[provider]?.implemented === false) {
+      toast.error(
+        `${PAYMENT_PROVIDERS[provider].label} ainda não tem integração escrita. ` +
+          'Peça o adapter antes de ativar este método.'
+      );
       return;
     }
-    setDisconnecting(true);
+
+    setSaving(method);
+    setRows((current) => current.map((r) => (r.method === method ? { ...r, ...patch } : r)));
     try {
-      await adminSettings.mercadoPagoDisconnect();
-      toast.success('Conta desconectada.');
-      await load();
+      await adminSettings.savePaymentConfig(method, patch);
+      toast.success('Configuração salva.');
     } catch (error) {
       toast.error(error.message);
+      await load();
     } finally {
-      setDisconnecting(false);
+      setSaving(null);
     }
   }
 
-  async function toggleActive(method, value) {
-    setMethods((current) =>
-      current.map((m) => (m.method === method.method ? { ...m, is_active: value } : m))
+  if (rows === null) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+      </div>
     );
-    try {
-      await adminSettings.savePaymentConfig(method.method, { is_active: value });
-    } catch (error) {
-      toast.error(error.message);
-      // Desfaz o toggle otimista se o servidor recusou.
-      setMethods((current) =>
-        current.map((m) => (m.method === method.method ? { ...m, is_active: !value } : m))
-      );
-    }
   }
 
-  function openEdit(method) {
-    setEditForm({ label: method.label, description: method.description ?? '' });
-    setEditSheet(method);
-  }
-
-  async function saveEdit() {
-    if (!editForm.label?.trim()) return toast.error('Informe o nome exibido ao cliente.');
-    setSaving(true);
-    try {
-      await adminSettings.savePaymentConfig(editSheet.method, {
-        label: editForm.label.trim(),
-        description: editForm.description?.trim() || null,
-      });
-      toast.success('Forma de pagamento atualizada.');
-      setEditSheet(null);
-      await load();
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const expired = mpStatus?.connected && mpStatus.expired;
+  const noneActive = rows.every((r) => !r.is_active);
 
   return (
     <div>
       <header className="mb-5">
         <h1 className="font-brand text-2xl text-cream">Pagamentos</h1>
-        <p className="text-sm text-cream-muted">Conta do Mercado Pago e formas de pagamento do checkout.</p>
+        <p className="text-sm text-cream-muted">
+          Escolha qual gateway atende cada forma de pagamento.
+        </p>
       </header>
 
-      {/* ----------------------------- Mercado Pago ----------------------------- */}
-      <Card className="mb-6 p-5">
-        <div className="flex items-start gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-vinho-50 text-vinho">
-            <CreditCard size={20} />
-          </span>
+      {/* Antes de tudo: para onde o dinheiro vai. Qualquer outra configuração
+          desta tela é detalhe perto disso. */}
+      <ContaMercadoPago />
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-brand text-lg text-cream">Conta do Mercado Pago</h2>
-              {mpStatus === null ? null : mpStatus.connected ? (
-                expired ? (
-                  <Badge tone="danger">Conexão expirada</Badge>
-                ) : (
-                  <Badge tone="success">Conectada</Badge>
-                )
-              ) : (
-                <Badge tone="neutral">Não conectada</Badge>
-              )}
-            </div>
-
-            {mpStatus === null ? (
-              <Skeleton className="mt-2 h-4 w-48" />
-            ) : mpStatus.connected ? (
-              <>
-                <p className="mt-1 text-sm text-cream-muted">
-                  {mpStatus.nickname || mpStatus.email || 'Conta conectada'}
-                </p>
-                <p className="mt-0.5 text-xs text-cream-faint">
-                  Conectada em {formatDateTime(mpStatus.connected_at)}
-                  {mpStatus.expires_at && ` · válida até ${formatDateTime(mpStatus.expires_at)}`}
-                </p>
-                {expired && (
-                  <p className="mt-2 flex items-center gap-1.5 text-xs text-danger">
-                    <AlertTriangle size={13} />
-                    A conexão expirou — conecte de novo para as cobranças continuarem caindo na sua conta.
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="mt-1 text-sm text-cream-muted">
-                Sem conta conectada, as cobranças caem na conta padrão do sistema, não na sua. Conecte
-                para o dinheiro cair direto na sua conta do Mercado Pago.
-              </p>
-            )}
-
-            <div className="mt-3 flex gap-2">
-              {mpStatus?.connected ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="text-danger"
-                  loading={disconnecting}
-                  onClick={disconnect}
-                >
-                  <Unlink size={14} /> Desconectar
-                </Button>
-              ) : (
-                <Button size="sm" loading={connecting} onClick={connect} disabled={mpStatus === null}>
-                  <Link2 size={14} /> Conectar conta
-                  <ExternalLink size={13} />
-                </Button>
-              )}
-              {expired && (
-                <Button size="sm" loading={connecting} onClick={connect}>
-                  <Link2 size={14} /> Conectar de novo
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* ------------------------------- Métodos -------------------------------- */}
-      <h2 className="mb-3 font-brand text-lg text-cream">Formas de pagamento no checkout</h2>
-
-      {methods === null ? (
-        <div className="space-y-2">
-          <Skeleton className="h-20" />
-          <Skeleton className="h-20" />
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {methods.map((method) => (
-            <Card key={method.method} className="flex flex-wrap items-center gap-3 p-4">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold text-cream">{method.label}</p>
-                  <Badge tone="neutral">{method.provider}</Badge>
-                  {!method.is_active && <Badge tone="danger">Desligado</Badge>}
-                </div>
-                {method.description && (
-                  <p className="mt-0.5 text-xs text-cream-muted">{method.description}</p>
-                )}
-              </div>
-
-              <Button size="sm" variant="ghost" onClick={() => openEdit(method)}>
-                <Pencil size={15} />
-              </Button>
-
-              <Switch checked={method.is_active} onChange={(v) => toggleActive(method, v)} />
-            </Card>
-          ))}
-        </div>
+      {noneActive && (
+        <Card className="mb-4 flex items-start gap-3 border-danger/40 bg-danger/10 p-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-danger" />
+          <p className="text-sm text-cream">
+            Nenhuma forma de pagamento está ativa — o cliente não consegue fechar pedido.
+          </p>
+        </Card>
       )}
 
-      <Sheet
-        open={Boolean(editSheet)}
-        onClose={() => setEditSheet(null)}
-        title="Editar forma de pagamento"
-        footer={
-          <Button className="w-full" loading={saving} onClick={saveEdit}>
-            Salvar
-          </Button>
-        }
-      >
-        <div className="space-y-4">
-          <Input
-            label="Nome exibido ao cliente"
-            value={editForm.label ?? ''}
-            onChange={(e) => setEditForm((c) => ({ ...c, label: e.target.value }))}
-          />
-          <Textarea
-            label="Descrição (opcional)"
-            value={editForm.description ?? ''}
-            onChange={(e) => setEditForm((c) => ({ ...c, description: e.target.value }))}
-            rows={2}
-          />
-        </div>
-      </Sheet>
+      <div className="space-y-3">
+        {rows.map((row) => {
+          const meta = METHOD_META[row.method];
+          const Icon = meta?.icon ?? CreditCard;
+          const compatible = Object.entries(PAYMENT_PROVIDERS).filter(([, p]) =>
+            p.methods.includes(row.method)
+          );
 
-      <p className="mt-4 flex items-start gap-1.5 text-xs text-cream-faint">
-        <CheckCircle2 size={13} className="mt-0.5 shrink-0" />
-        Formas de pagamento sem integração pronta (cartão via Mercado Pago/PagBank, por exemplo) devem
-        ficar desligadas até o processamento estar configurado — senão o cliente chega ao fim do
-        checkout e a cobrança não completa.
-      </p>
+          return (
+            <Card key={row.method} className={clsx('p-4', !row.is_active && 'opacity-70')}>
+              <div className="flex flex-wrap items-center gap-3">
+                <span
+                  className={clsx(
+                    'grid h-11 w-11 shrink-0 place-items-center rounded-xl',
+                    row.is_active ? 'bg-vinho-gradient text-white' : 'bg-ink-300 text-cream-faint'
+                  )}
+                >
+                  <Icon size={20} />
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-cream">{meta?.label ?? row.method}</p>
+                    <Badge tone={row.is_active ? 'success' : 'neutral'}>
+                      {row.is_active ? '● Ativo' : '○ Inativo'}
+                    </Badge>
+                    <Badge tone="info">{PAYMENT_PROVIDERS[row.provider]?.label ?? row.provider}</Badge>
+                    {PAYMENT_PROVIDERS[row.provider]?.implemented === false && (
+                      <Badge tone="warning">Sem integração</Badge>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-cream-faint">{meta?.hint}</p>
+                  {PAYMENT_PROVIDERS[row.provider]?.implemented === false && (
+                    <p className="mt-1 text-xs text-warning">
+                      O adapter de {PAYMENT_PROVIDERS[row.provider].label} ainda não foi escrito —
+                      este método não pode ser ativado até isso ser feito.
+                    </p>
+                  )}
+                </div>
+
+                <div className="shrink-0">
+                  <Switch
+                    checked={row.is_active}
+                    disabled={saving === row.method}
+                    onChange={(v) => save(row.method, { is_active: v })}
+                    label=""
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 border-t border-line pt-4 md:grid-cols-2">
+                <Select
+                  label="Provedor"
+                  value={row.provider}
+                  disabled={row.method === 'na_entrega'}
+                  onChange={(e) => save(row.method, { provider: e.target.value })}
+                >
+                  {compatible.map(([value, provider]) => (
+                    <option key={value} value={value}>
+                      {provider.label} — {provider.note}
+                    </option>
+                  ))}
+                </Select>
+
+                <Input
+                  label="Como o cliente vê"
+                  defaultValue={row.label}
+                  onBlur={(e) => {
+                    if (e.target.value.trim() && e.target.value !== row.label) {
+                      save(row.method, { label: e.target.value.trim() });
+                    }
+                  }}
+                />
+
+                <Input
+                  className="md:col-span-2"
+                  label="Descrição no checkout"
+                  defaultValue={row.description ?? ''}
+                  onBlur={(e) => {
+                    if (e.target.value !== row.description) {
+                      save(row.method, { description: e.target.value.trim() || null });
+                    }
+                  }}
+                />
+
+                {/* Desconto por escolher esta forma.
+                    O Pix custa 0,99% e o débito 3,99%: um desconto pequeno no
+                    Pix ainda deixa o restaurante na frente e treina o cliente
+                    a escolher a forma que sangra menos. Aparece como selo no
+                    checkout e sai do total, calculado no servidor. */}
+                <Input
+                  label="Desconto para o cliente (%)"
+                  type="number"
+                  min={0}
+                  max={20}
+                  step="0.5"
+                  defaultValue={Number(row.discount_percent ?? 0)}
+                  hint={
+                    row.method === 'pix'
+                      ? 'O Pix é a forma mais barata para a casa — vale incentivar.'
+                      : '0 = sem desconto.'
+                  }
+                  onBlur={(e) => {
+                    const valor = Math.min(20, Math.max(0, Number(e.target.value) || 0));
+                    if (valor !== Number(row.discount_percent ?? 0)) {
+                      save(row.method, { discount_percent: valor });
+                    }
+                  }}
+                />
+
+                {row.method === 'cartao_credito' && (
+                  <>
+                    <Input
+                      label="Máximo de parcelas"
+                      type="number"
+                      min={1}
+                      max={12}
+                      defaultValue={row.options?.max_installments ?? 3}
+                      onBlur={(e) =>
+                        save(row.method, {
+                          options: {
+                            ...row.options,
+                            max_installments: Math.max(1, Number(e.target.value) || 1),
+                          },
+                        })
+                      }
+                    />
+                    <Input
+                      label="Parcela mínima (R$)"
+                      type="number"
+                      min={1}
+                      defaultValue={(row.options?.min_installment_cents ?? 2000) / 100}
+                      onBlur={(e) =>
+                        save(row.method, {
+                          options: {
+                            ...row.options,
+                            min_installment_cents: Math.round((Number(e.target.value) || 20) * 100),
+                          },
+                        })
+                      }
+                      hint="Abaixo disso, a opção de parcela some do checkout."
+                    />
+                  </>
+                )}
+
+                {row.method === 'pix' && (
+                  <Input
+                    label="Expiração do Pix (minutos)"
+                    type="number"
+                    min={5}
+                    defaultValue={row.options?.expires_minutes ?? 30}
+                    onBlur={(e) =>
+                      save(row.method, {
+                        options: {
+                          ...row.options,
+                          expires_minutes: Math.max(5, Number(e.target.value) || 30),
+                        },
+                      })
+                    }
+                  />
+                )}
+
+                {row.method === 'na_entrega' && (
+                  <div className="space-y-3 rounded-xl border border-line bg-ink-300 p-3.5 md:col-span-2">
+                    <p className="text-xs font-semibold text-cream">
+                      Formas aceitas na entrega
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(ON_DELIVERY_KINDS).map(([key, kind]) => {
+                        const enabled = (row.options?.kinds ?? []).includes(key);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              const current = row.options?.kinds ?? [];
+                              const next = enabled
+                                ? current.filter((k) => k !== key)
+                                : [...current, key];
+                              if (next.length === 0) {
+                                toast.error('Deixe ao menos uma forma de pagamento na entrega.');
+                                return;
+                              }
+                              save(row.method, { options: { ...row.options, kinds: next } });
+                            }}
+                            className={clsx(
+                              'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                              enabled
+                                ? 'border-vinho-500 bg-vinho-900/40 text-cream'
+                                : 'border-line bg-ink-500 text-cream-faint'
+                            )}
+                          >
+                            {kind.badge}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <p className="text-[11px] text-cream-faint">
+                      Crédito e débito na entrega exigem maquininha — a comanda avisa o entregador.
+                    </p>
+
+                    <Switch
+                      checked={row.options?.ask_change ?? true}
+                      onChange={(v) =>
+                        save(row.method, { options: { ...row.options, ask_change: v } })
+                      }
+                      label="Perguntar sobre troco"
+                      description='Mostra o campo "precisa de troco para quanto?" quando for dinheiro'
+                    />
+                  </div>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Onde ficam as chaves */}
+      <Card className="mt-5 p-4">
+        <h2 className="mb-2 flex items-center gap-2 font-brand text-lg text-cream">
+          <ShieldCheck size={17} className="text-success" /> Chaves de API
+        </h2>
+        <p className="text-sm text-cream-muted">
+          Por segurança, as chaves dos gateways não ficam nesta tela nem no banco de dados. Elas são
+          cadastradas como <em>secrets</em> das Edge Functions do Supabase:
+        </p>
+
+        <pre className="mt-3 overflow-x-auto rounded-xl bg-ink-800 p-3.5 text-[11px] leading-relaxed text-cream-muted">
+{`supabase secrets set \\
+  INFINITEPAY_API_KEY=...      # Pix
+  INFINITEPAY_HANDLE=...       # seu @handle na InfinitePay
+  INFINITEPAY_WEBHOOK_SECRET=...
+  ASAAS_API_KEY=...            # Cartão
+  ASAAS_WEBHOOK_TOKEN=...
+  ASAAS_ENV=sandbox            # ou production`}
+        </pre>
+
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-line bg-ink-300 p-3">
+          <Info size={15} className="mt-0.5 shrink-0 text-cream-faint" />
+          <p className="text-xs text-cream-faint">
+            Depois de trocar um provedor aqui, confirme que a URL de webhook correspondente está
+            cadastrada no painel do gateway — sem isso o pedido fica preso em “aguardando pagamento”.
+          </p>
+        </div>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          className="mt-3"
+          onClick={() => {
+            const base = import.meta.env.VITE_SUPABASE_URL;
+            navigator.clipboard?.writeText(
+              `InfinitePay: ${base}/functions/v1/webhook-infinitepay\nAsaas: ${base}/functions/v1/webhook-asaas`
+            );
+            toast.success('URLs de webhook copiadas.');
+          }}
+        >
+          Copiar URLs de webhook
+        </Button>
+      </Card>
     </div>
   );
 }
