@@ -82,7 +82,12 @@ export default function AdminOrders() {
     [load, toast]
   );
 
-  useRealtimeOrders({ onChange });
+  // pollMs mais espaçado aqui de propósito: esta recarga é PESADA (até 120
+  // pedidos com itens e cliente juntados), diferente da checagem leve que o
+  // AdminLayout já faz a cada poucos segundos em toda tela do painel. O tempo
+  // real continua cobrindo o caso instantâneo (pedido novo, mudança de
+  // status); o poll aqui é só a rede de segurança contra socket que dormiu.
+  useRealtimeOrders({ onChange, pollMs: 40000 });
 
   async function advance(order) {
     const next = nextStatusFor(order);

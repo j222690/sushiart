@@ -61,11 +61,24 @@ function SinoDePedidoNovo() {
   // O navegador libera áudio no primeiro toque da pessoa. Enquanto isso não
   // acontece, o painel avisa — em vez de ficar mudo esperando alguém descobrir
   // no pedido perdido.
+  //
+  // A primeira checagem espera 6s (não 1,5s) de propósito: quem abre o painel
+  // quase sempre clica em algo nesse intervalo (um pedido, uma aba) — e isso
+  // já libera o som sozinho, sem o aviso chegar a aparecer. Só quem realmente
+  // fica parado sem tocar em nada vê o aviso. As checagens seguintes voltam a
+  // ser rápidas (1,5s), pra pegar o caso raro de o navegador suspender o som
+  // no meio do uso (aba muito tempo em segundo plano, por exemplo).
   useEffect(() => {
     const solta = liberarNoPrimeiroToque();
-    const conferir = setInterval(() => setBloqueado(sinoLigado() && !sinoLiberado()), 1500);
+    const primeira = setTimeout(() => setBloqueado(sinoLigado() && !sinoLiberado()), 6000);
+    let conferir;
+    const iniciarChecagemRapida = setTimeout(() => {
+      conferir = setInterval(() => setBloqueado(sinoLigado() && !sinoLiberado()), 1500);
+    }, 6000);
     return () => {
       solta();
+      clearTimeout(primeira);
+      clearTimeout(iniciarChecagemRapida);
       clearInterval(conferir);
     };
   }, []);

@@ -7,7 +7,7 @@ import clsx from 'clsx';
 import AddressForm from '../../components/AddressForm';
 import CouponCard from '../../components/CouponCard';
 import { Button, Card, Input, Sheet, Spinner } from '../../components/ui';
-import { orders as ordersApi, profile, promo } from '../../lib/api';
+import { home, orders as ordersApi, profile, promo } from '../../lib/api';
 import { useCart } from '../../store/cart';
 import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
@@ -62,8 +62,14 @@ export default function Checkout() {
     if (!user) navigate('/entrar?next=/checkout', { replace: true });
   }, [user, navigate]);
 
+  // Vira true assim que o pedido é criado, ANTES de esvaziar o carrinho —
+  // evita que o guard abaixo (carrinho vazio -> volta pro carrinho) dispare
+  // por causa do próprio cart.clear() da confirmação e brigue com a
+  // navegação para a tela de pagamento.
+  const pedidoCriado = useRef(false);
+
   useEffect(() => {
-    if (items.length === 0) navigate('/carrinho', { replace: true });
+    if (items.length === 0 && !pedidoCriado.current) navigate('/carrinho', { replace: true });
   }, [items.length, navigate]);
 
   useEffect(() => {
@@ -77,7 +83,19 @@ export default function Checkout() {
     });
     promo.loyaltyBalance().then(setPoints).catch(() => setPoints(0));
     promo.loyaltyConfig().then(setLoyalty).catch(() => setLoyalty(null));
-    promo.myCoupons(user.id).then(setAvailableCoupons).catch(() => setAvailableCoupons([]));
+    // Traz TODOS os cupons válidos do cliente: os públicos (disponíveis pra
+    // todo mundo) e os pessoais (prêmios de roleta/fidelidade) — igual à
+    // tela de Ofertas. Antes só vinham os pessoais, e o cliente não via os
+    // cupons públicos aqui no checkout.
+    home
+      .publicCoupons()
+      .then((rows) => {
+        // Contas staff enxergam tudo (inclusive vencidos) — filtra aqui
+        // também pra não oferecer cupom expirado no checkout.
+        const now = Date.now();
+        setAvailableCoupons(rows.filter((c) => !c.valid_until || new Date(c.valid_until) >= now));
+      })
+      .catch(() => setAvailableCoupons([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -252,6 +270,7 @@ export default function Checkout() {
       });
 
       const result = await ordersApi.create(payload);
+      pedidoCriado.current = true;
       cart.clear();
 
       if (result.requires_payment) {

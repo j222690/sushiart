@@ -36,10 +36,13 @@ export default function Offers() {
     home
       .publicCoupons()
       .then((rows) => {
-        // A policy já devolve só cupons válidos; separamos os públicos dos
-        // pessoais (prêmios de roleta e fidelidade) para exibir em blocos.
-        setPublicCoupons(rows.filter((c) => c.is_public && !c.customer_id));
-        setMyCoupons(rows.filter((c) => c.customer_id));
+        // A policy já devolve só cupons válidos para clientes comuns, mas
+        // contas staff enxergam tudo (inclusive vencidos) — por isso
+        // filtramos vencidos aqui também, pra ninguém ver cupom expirado.
+        const now = Date.now();
+        const validRows = rows.filter((c) => !c.valid_until || new Date(c.valid_until) >= now);
+        setPublicCoupons(validRows.filter((c) => c.is_public && !c.customer_id));
+        setMyCoupons(validRows.filter((c) => c.customer_id));
       })
       .catch(() => undefined);
   }, []);

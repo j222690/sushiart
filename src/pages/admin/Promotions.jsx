@@ -252,6 +252,30 @@ export default function Promotions() {
     }
   }
 
+  const expiredCoupons = (coupons ?? []).filter(
+    (c) => c.valid_until && new Date(c.valid_until) < new Date()
+  );
+
+  async function clearExpiredCoupons() {
+    if (expiredCoupons.length === 0) return;
+    if (!window.confirm(`Excluir ${expiredCoupons.length} cupom(ns) expirado(s)?`)) return;
+    setSaving(true);
+    try {
+      // Tenta excluir um por um: cupons já usados só serão pulados (o erro
+      // é ignorado por item), sem travar a limpeza dos demais.
+      const results = await Promise.allSettled(expiredCoupons.map((c) => adminCoupons.remove(c.id)));
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      await load();
+      if (failed > 0) {
+        toast.error(`${expiredCoupons.length - failed} excluído(s). ${failed} não puderam ser removidos.`);
+      } else {
+        toast.success('Cupons expirados excluídos.');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const TABS = [
     { key: 'cupons', label: 'Cupons', icon: Ticket },
     { key: 'ofertas', label: 'Ofertas', icon: Flame },
@@ -266,14 +290,22 @@ export default function Promotions() {
           <p className="text-sm text-cream-muted">Cupons, ofertas em destaque e banners da home.</p>
         </div>
 
-        <Button
-          onClick={() =>
-            tab === 'cupons' ? openCoupon('novo') : tab === 'ofertas' ? openOffer('nova') : openBanner('novo')
-          }
-        >
-          <Plus size={15} />
-          {tab === 'cupons' ? 'Novo cupom' : tab === 'ofertas' ? 'Nova oferta' : 'Novo banner'}
-        </Button>
+        <div className="flex gap-2">
+          {tab === 'cupons' && expiredCoupons.length > 0 && (
+            <Button variant="secondary" className="text-danger" loading={saving} onClick={clearExpiredCoupons}>
+              <Trash2 size={15} />
+              Excluir expirados ({expiredCoupons.length})
+            </Button>
+          )}
+          <Button
+            onClick={() =>
+              tab === 'cupons' ? openCoupon('novo') : tab === 'ofertas' ? openOffer('nova') : openBanner('novo')
+            }
+          >
+            <Plus size={15} />
+            {tab === 'cupons' ? 'Novo cupom' : tab === 'ofertas' ? 'Nova oferta' : 'Novo banner'}
+          </Button>
+        </div>
       </header>
 
       <div className="mb-4 flex gap-2 border-b border-line">

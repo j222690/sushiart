@@ -34,8 +34,8 @@ export default function CouponCard({ coupon, onApply, applied, disabled }) {
     >
       {/* Talão do bilhete */}
       <div className="flex w-24 shrink-0 flex-col items-center justify-center bg-vinho-gradient px-2 py-4 text-center">
-        <Ticket size={18} className="mb-1 text-cream/80" />
-        <p className="text-sm font-extrabold leading-tight text-cream">{describe(coupon)}</p>
+        <Ticket size={18} className="mb-1 text-white/80" />
+        <p className="text-sm font-extrabold leading-tight text-white">{describe(coupon)}</p>
       </div>
 
       {/* Recorte */}
