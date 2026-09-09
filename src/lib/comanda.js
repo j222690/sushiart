@@ -137,11 +137,42 @@ export function htmlDaComanda(order, restaurante = {}) {
 </body></html>`;
 }
 
+// 1px CSS = 1/96 polegada. Convertido pra mm porque é o que o `@page` entende.
+const PX_PARA_MM = 25.4 / 96;
+
+// Sobra no fim do rolo. Sem isso, um conteúdo que bate exatamente no limite
+// do preset corta a última linha (normalmente o rodapé) fora do papel.
+const FOLGA_MM = 12;
+
+/**
+ * A POS-80 não aceita altura contínua/arbitrária — só os tamanhos que estão
+ * cadastrados no driver dela. Mandar um valor fora dessa lista (como o `auto`
+ * do CSS, ou qualquer mm calculado livremente) é o que fazia a impressão
+ * "passar" pelo spooler sem nada sair no papel.
+ *
+ * Em ordem crescente: pega-se o menor que couber o conteúdo.
+ */
+const ALTURAS_SUPORTADAS_MM = [210, 279];
+
 /**
  * Abre a comanda e manda imprimir.
  *
  * Janela pequena e fechada depois: numa noite movimentada, sem o `close()` o
  * balcão termina com trinta abas abertas e o navegador arrastando.
+ *
+ * ALTURA FIXA EM VEZ DE `auto`
+ *
+ * O `@page { size: 80mm auto }` no HTML da comanda funciona liso numa
+ * impressora virtual (Salvar como PDF), mas a maioria dos drivers GDI de
+ * térmica real — a POS-80 incluída — não lida direito com altura automática:
+ * o Chrome resolve isso pra algum tamanho fixo do driver (às vezes A4), o
+ * trabalho é aceito pelo spooler, mas a impressora fica esperando uma página
+ * que nunca fecha do jeito que ela espera — por isso parece que imprimiu e
+ * nada sai.
+ *
+ * Por isso aqui a gente mede a altura real do conteúdo já renderizado
+ * (comanda de 1 item e de 15 itens têm alturas bem diferentes) e sobrescreve
+ * o `@page` com um valor fixo em mm antes de chamar `print()`.
  *
  * O `onafterprint` fecha depois que a impressão sai (ou é cancelada). O
  * `setTimeout` de reserva existe porque nem todo navegador dispara esse evento
@@ -155,6 +186,23 @@ export function imprimirComanda(order, restaurante) {
   janela.document.close();
 
   janela.onload = () => {
+    // Altura real do conteúdo, já com o body renderizado.
+    const alturaPx = janela.document.body.scrollHeight;
+    const alturaMm = Math.ceil(alturaPx * PX_PARA_MM) + FOLGA_MM;
+
+    // Pega o menor preset que o driver aceita e que couber o conteúdo. Se a
+    // comanda for maior que o maior preset (pedido enorme, incomum), usa o
+    // maior mesmo — melhor cortar o fim de uma comanda gigante do que não
+    // imprimir nada.
+    const alturaEscolhida =
+      ALTURAS_SUPORTADAS_MM.find((h) => h >= alturaMm) ??
+      ALTURAS_SUPORTADAS_MM[ALTURAS_SUPORTADAS_MM.length - 1];
+
+    const sobrescreveAltura = janela.document.createElement('style');
+    // Depois no cascade do que o @page original em htmlDaComanda, então vence.
+    sobrescreveAltura.textContent = `@page { size: 80mm ${alturaEscolhida}mm; margin: 3mm; }`;
+    janela.document.head.appendChild(sobrescreveAltura);
+
     janela.focus();
     janela.print();
   };
