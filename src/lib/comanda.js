@@ -106,7 +106,6 @@ export function htmlDaComanda(order, restaurante = {}) {
   /* 34 mm numa bobina de 80: a 203 dpi dá cerca de 7 pontos por módulo, bem
      acima do mínimo para leitura confiável, e ainda sobra margem lateral. */
   .qr { width: 34mm; height: 34mm; display: block; margin: 0 auto; }
-  .promo-site { font-size: 10px; margin-top: 3px; letter-spacing: 0.5px; }
 </style></head><body>
 
   <h1>SUSHI ART</h1>
@@ -152,7 +151,6 @@ export function htmlDaComanda(order, restaurante = {}) {
     <div class="promo-titulo">ACESSE NOSSO APP</div>
     <div class="promo-texto">E GANHE DESCONTOS<br>POR TEMPO ILIMITADO</div>
     ${QR_DO_APP}
-    <div class="promo-site">sushiarts.online</div>
   </div>
 </body></html>`;
 }
@@ -179,11 +177,6 @@ const QR_DO_APP = `<svg class="qr" viewBox="-4 -4 37 37" shape-rendering="crispE
 // 1px CSS = 1/96 polegada. Convertido pra mm porque é o que o `@page` entende.
 const PX_PARA_MM = 25.4 / 96;
 
-// A largura que sobra da bobina depois das margens do `@page`: 80 - 3 - 3.
-// É a largura em que o iframe precisa renderizar para que a altura medida na
-// tela corresponda à altura que vai sair no papel.
-const LARGURA_UTIL_PX = Math.round(74 / PX_PARA_MM);
-
 // Sobra no fim do rolo. Sem isso, um conteúdo que bate exatamente no limite
 // do preset corta a última linha (normalmente o rodapé) fora do papel.
 const FOLGA_MM = 12;
@@ -196,50 +189,7 @@ const FOLGA_MM = 12;
  *
  * Em ordem crescente: pega-se o menor que couber o conteúdo.
  */
-const ALTURAS_PADRAO_MM = [210, 279];
-
-/** Onde fica a lista personalizada deste aparelho. */
-const CHAVE_ALTURAS = 'sushiart.comanda-alturas';
-
-/** Última medição, para consultar depois sem precisar do console aberto. */
-const CHAVE_MEDIDA = 'sushiart.comanda-ultima-medida';
-
-/**
- * Os tamanhos de papel que ESTE aparelho pode usar.
- *
- * O padrão é conservador: 210 e 279 são os dois que já se provaram seguros, e
- * um tamanho que o driver não reconhece nao imprime NADA — o trabalho entra no
- * spooler e morre lá, calado. Errar para menos aqui custa o pedido inteiro.
- *
- * Mas cada térmica aceita uma lista diferente, e adivinhar daqui seria
- * arriscar justamente esse silêncio. Então a lista é ajustável por aparelho,
- * pelo console do navegador:
- *
- *     localStorage.setItem('sushiart.comanda-alturas', '150,210,279')
- *
- * Assim dá para descobrir o menor tamanho que a impressora aceita testando na
- * própria máquina, sem esperar por uma nova publicação. Se algum valor não
- * imprimir, é só tirar da lista.
- *
- * Valores inválidos são ignorados em silêncio e o padrão volta: uma lista
- * digitada errada não pode ser o motivo de a comanda parar de sair.
- */
-function alturasSuportadasMm() {
-  try {
-    const bruto = window.localStorage.getItem(CHAVE_ALTURAS);
-    if (!bruto) return ALTURAS_PADRAO_MM;
-
-    const lista = bruto
-      .split(',')
-      .map((n) => Number.parseInt(n.trim(), 10))
-      .filter((n) => Number.isFinite(n) && n >= 40 && n <= 1200)
-      .sort((a, b) => a - b);
-
-    return lista.length ? lista : ALTURAS_PADRAO_MM;
-  } catch {
-    return ALTURAS_PADRAO_MM;
-  }
-}
+const ALTURAS_SUPORTADAS_MM = [210, 279];
 
 /**
  * Monta a comanda e manda imprimir.
@@ -279,22 +229,9 @@ export function imprimirComanda(order, restaurante) {
   const quadro = document.createElement('iframe');
   quadro.setAttribute('aria-hidden', 'true');
   quadro.setAttribute('tabindex', '-1');
-  // ESCONDIDO FORA DA TELA, E NÃO COM TAMANHO ZERO
-  //
-  // A primeira versão usava `width:0;height:0`. Parecia inofensivo — o iframe
-  // some do mesmo jeito — mas destruía a medição da altura: num viewport de
-  // largura zero o texto quebra a CADA LETRA, o `scrollHeight` vira um número
-  // enorme, e a comanda caía sempre no maior preset do driver. Na prática:
-  // toda comanda saía com 279 mm de papel, quase o dobro do necessário.
-  //
-  // (Na janela separada isso não acontecia, porque ela tinha 380 px de
-  // largura. O problema nasceu junto com a troca para iframe.)
-  //
-  // Agora o iframe tem a largura REAL de impressão, então o que se mede na
-  // tela é o que vai sair no papel. Ele some saindo de cena, não encolhendo.
+  // Fora da vista, sem ocupar espaço e sem participar do layout da página.
   quadro.style.cssText =
-    `position:fixed;left:-10000px;top:0;width:${LARGURA_UTIL_PX}px;height:1200px;` +
-    'border:0;opacity:0;pointer-events:none;';
+    'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
   document.body.appendChild(quadro);
 
   const doc = quadro.contentDocument;
@@ -325,13 +262,12 @@ export function imprimirComanda(order, restaurante) {
     // que o driver aceita e que couber. Se a comanda for maior que o maior
     // preset (pedido enorme, incomum), usa o maior mesmo — melhor cortar o fim
     // de uma comanda gigante do que não imprimir nada.
-    const alturas = alturasSuportadasMm();
-
-    // Quanto o conteúdo realmente ocupa, antes de arredondar para um preset.
-    const conteudoMm = () => Math.ceil(doc.body.scrollHeight * PX_PARA_MM) + FOLGA_MM;
     const medir = () => {
-      const mm = conteudoMm();
-      return alturas.find((h) => h >= mm) ?? alturas[alturas.length - 1];
+      const mm = Math.ceil(doc.body.scrollHeight * PX_PARA_MM) + FOLGA_MM;
+      return (
+        ALTURAS_SUPORTADAS_MM.find((h) => h >= mm) ??
+        ALTURAS_SUPORTADAS_MM[ALTURAS_SUPORTADAS_MM.length - 1]
+      );
     };
 
     let alturaEscolhida = medir();
@@ -346,7 +282,7 @@ export function imprimirComanda(order, restaurante) {
     //
     // Então: se ele não couber de graça, sai. O pedido é o que tem que sair.
     const promo = doc.querySelector('.promo');
-    if (promo && alturaEscolhida !== alturas[0]) {
+    if (promo && alturaEscolhida !== ALTURAS_SUPORTADAS_MM[0]) {
       const separador = promo.previousElementSibling;
       promo.style.display = 'none';
       if (separador?.tagName === 'HR') separador.style.display = 'none';
@@ -360,32 +296,6 @@ export function imprimirComanda(order, restaurante) {
         promo.style.display = '';
         if (separador?.tagName === 'HR') separador.style.display = '';
       }
-    }
-
-    // ----------------------------------------------------------------------
-    // A medida, para quem estiver ajustando o tamanho do papel
-    //
-    // O papel é sempre um dos presets do driver, e o conteúdo quase nunca bate
-    // exatamente num deles — a diferença sai como sobra em branco no fim.
-    // Saber os dois números transforma "sobrou um palmo" em "sobrou 42 mm, o
-    // próximo preset a testar é 180".
-    //
-    // Fica no console (para quem estiver com o F12 aberto durante o ajuste) e
-    // também gravado, porque durante o serviço ninguém vai estar olhando o
-    // console na hora exata em que a comanda sai:
-    //
-    //     localStorage.getItem('sushiart.comanda-ultima-medida')
-    // ----------------------------------------------------------------------
-    const usados = conteudoMm();
-    const sobra = alturaEscolhida - usados;
-    const resumo = `conteúdo ${usados}mm · papel ${alturaEscolhida}mm · sobra ${sobra}mm`;
-
-    try {
-      console.info(`[comanda] ${resumo} · tamanhos disponíveis: ${alturas.join(', ')}mm`);
-      window.localStorage.setItem(CHAVE_MEDIDA, resumo);
-    } catch {
-      // Console ou storage indisponível. É diagnóstico, não pode impedir a
-      // comanda de sair.
     }
 
     const sobrescreveAltura = doc.createElement('style');
