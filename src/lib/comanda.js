@@ -155,10 +155,20 @@ const FOLGA_MM = 12;
 const ALTURAS_SUPORTADAS_MM = [210, 279];
 
 /**
- * Abre a comanda e manda imprimir.
+ * Monta a comanda e manda imprimir.
  *
- * Janela pequena e fechada depois: numa noite movimentada, sem o `close()` o
- * balcão termina com trinta abas abertas e o navegador arrastando.
+ * UM IFRAME ESCONDIDO, E NÃO UMA JANELA NOVA
+ *
+ * `window.open` só é permitido logo depois de um clique da pessoa. A impressão
+ * automática acontece sem clique nenhum — o pedido chega sozinho — e aí o
+ * navegador bloqueia a janela. Com a aba em segundo plano, que é o caso normal
+ * numa cozinha (o painel fica atrás do sistema de caixa), ele bloqueia sempre.
+ *
+ * Era esse o motivo de "não imprime sozinho quando não estou na tela do app".
+ *
+ * Um iframe escondido não passa pelo bloqueador de pop-up, não rouba o foco de
+ * quem está digitando outra coisa, não deixa janela órfã pelo balcão, e chama
+ * a mesma caixa de impressão do navegador.
  *
  * ALTURA FIXA EM VEZ DE `auto`
  *
@@ -174,20 +184,45 @@ const ALTURAS_SUPORTADAS_MM = [210, 279];
  * (comanda de 1 item e de 15 itens têm alturas bem diferentes) e sobrescreve
  * o `@page` com um valor fixo em mm antes de chamar `print()`.
  *
- * O `onafterprint` fecha depois que a impressão sai (ou é cancelada). O
- * `setTimeout` de reserva existe porque nem todo navegador dispara esse evento
- * — e aba que não fecha sozinha é a que vira as trinta.
+ * O iframe é removido depois que a impressão sai (ou é cancelada). O
+ * `setTimeout` de reserva existe porque nem todo navegador dispara
+ * `onafterprint` — e iframe que não some vira centenas ao longo de um turno.
  */
 export function imprimirComanda(order, restaurante) {
-  const janela = window.open('', '_blank', 'width=380,height=640');
-  if (!janela) return { ok: false, motivo: 'O navegador bloqueou a janela de impressão.' };
+  const quadro = document.createElement('iframe');
+  quadro.setAttribute('aria-hidden', 'true');
+  quadro.setAttribute('tabindex', '-1');
+  // Fora da vista, sem ocupar espaço e sem participar do layout da página.
+  quadro.style.cssText =
+    'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+  document.body.appendChild(quadro);
 
-  janela.document.write(htmlDaComanda(order, restaurante));
-  janela.document.close();
+  const doc = quadro.contentDocument;
+  if (!doc) {
+    quadro.remove();
+    return { ok: false, motivo: 'O navegador não permitiu preparar a comanda.' };
+  }
 
-  janela.onload = () => {
+  doc.open();
+  doc.write(htmlDaComanda(order, restaurante));
+  doc.close();
+
+  let encerrado = false;
+  const remover = () => {
+    if (encerrado) return;
+    encerrado = true;
+    quadro.remove();
+  };
+
+  const imprimir = () => {
+    const janela = quadro.contentWindow;
+    if (!janela) {
+      remover();
+      return;
+    }
+
     // Altura real do conteúdo, já com o body renderizado.
-    const alturaPx = janela.document.body.scrollHeight;
+    const alturaPx = doc.body.scrollHeight;
     const alturaMm = Math.ceil(alturaPx * PX_PARA_MM) + FOLGA_MM;
 
     // Pega o menor preset que o driver aceita e que couber o conteúdo. Se a
@@ -198,22 +233,35 @@ export function imprimirComanda(order, restaurante) {
       ALTURAS_SUPORTADAS_MM.find((h) => h >= alturaMm) ??
       ALTURAS_SUPORTADAS_MM[ALTURAS_SUPORTADAS_MM.length - 1];
 
-    const sobrescreveAltura = janela.document.createElement('style');
+    const sobrescreveAltura = doc.createElement('style');
     // Depois no cascade do que o @page original em htmlDaComanda, então vence.
     sobrescreveAltura.textContent = `@page { size: 80mm ${alturaEscolhida}mm; margin: 3mm; }`;
-    janela.document.head.appendChild(sobrescreveAltura);
+    doc.head.appendChild(sobrescreveAltura);
 
-    janela.focus();
-    janela.print();
-  };
-  janela.onafterprint = () => janela.close();
-  setTimeout(() => {
+    janela.onafterprint = remover;
+
     try {
-      if (!janela.closed) janela.close();
+      // `focus()` no iframe (e não na página) porque o Safari imprime a página
+      // de fora quando o foco não está no documento que se quer imprimir.
+      janela.focus();
+      janela.print();
     } catch {
-      // Janela já fechada pela pessoa. Nada a fazer.
+      remover();
     }
-  }, 20000);
+  };
+
+  // A comanda é texto puro — sem imagem nem fonte externa para esperar. Então
+  // logo depois do `close()` o documento já está pronto para medir. O `onload`
+  // cobre o navegador que ainda não terminou de montar.
+  if (doc.readyState === 'complete') {
+    setTimeout(imprimir, 50);
+  } else {
+    quadro.onload = imprimir;
+  }
+
+  // Rede de segurança: `onafterprint` não é garantido em todo navegador, e sem
+  // isto o iframe ficaria pendurado no DOM a cada pedido.
+  setTimeout(remover, 60000);
 
   return { ok: true };
 }

@@ -128,6 +128,37 @@ export function tocarSino(repeticoes = 4) {
   const ctx = pegarContexto();
   if (!ctx) return;
 
+  // ESPERAR O `resume()` TERMINAR ANTES DE AGENDAR
+  //
+  // `resume()` é assíncrono, e enquanto o contexto está suspenso o
+  // `currentTime` fica PARADO. Agendar as notas nesse instante as coloca num
+  // relógio congelado: quando o resume enfim termina, o tempo salta para
+  // frente de uma vez e todos os inícios já ficaram no passado. O resultado é
+  // um estalo — ou silêncio.
+  //
+  // Era exatamente este o caso de "não toca quando o painel está atrás de
+  // outra janela": o navegador suspende o contexto da aba em segundo plano, o
+  // pedido chega, e o alarme sai mudo. O código chamava `resume()` e seguia em
+  // frente no mesmo instante, sem esperar.
+  if (ctx.state === 'suspended') {
+    ctx
+      .resume()
+      .then(() => agendarToque(ctx, repeticoes))
+      .catch(() => {
+        // Navegador recusou liberar o áudio (nenhum gesto da pessoa ainda).
+        // O painel já mostra o aviso de som bloqueado; não há o que fazer aqui.
+      });
+    return;
+  }
+
+  agendarToque(ctx, repeticoes);
+}
+
+/**
+ * Monta e dispara as notas. Só é chamada com o contexto já rodando — ver o
+ * comentário sobre o relógio congelado em `tocarSino`.
+ */
+function agendarToque(ctx, repeticoes) {
   // Compressor entre as notas e a saída: deixa levantar o volume sem a
   // distorção suja que aparece quando a soma dos osciladores estoura em 1.0.
   const compressor = ctx.createDynamicsCompressor();

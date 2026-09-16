@@ -84,11 +84,20 @@ export function useRealtimeOrders({
   useEffect(() => {
     if (!enabled || !pollMs) return undefined;
 
-    // Aba escondida não precisa de consulta: ninguém está olhando, e o celular
-    // no bolso não deveria gastar bateria e dados por isso. Ao voltar para a
-    // tela, uma consulta imediata põe tudo em dia.
+    // Esta consulta era pulada com a aba escondida, para poupar bateria do
+    // celular no bolso. Para o painel da cozinha a regra estava invertida: o
+    // pedido chega JUSTAMENTE quando ninguém está olhando a tela — a janela
+    // fica atrás do sistema de caixa, ou o monitor do balcão em segundo plano.
+    // Era o único momento em que a rede de segurança importava, e era o único
+    // momento em que ela não rodava.
+    //
+    // Um `select` indexado a cada dez segundos é barato. Pedido perdido não é.
+    //
+    // Vale saber do limite: o navegador afrouxa `setInterval` em aba de
+    // segundo plano (no Chrome, para cerca de uma vez por minuto). Quem
+    // entrega rápido continua sendo o tempo real, que não sofre essa
+    // limitação; isto aqui é o que segura a queda quando ele falha.
     function conferir() {
-      if (document.visibilityState !== 'visible') return;
       // `null` no lugar do registro: quem chama recarrega da fonte, que é o
       // que já acontece no tempo real. Passar um registro montado aqui daria
       // dois formatos diferentes para o mesmo callback tratar.

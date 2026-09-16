@@ -100,9 +100,9 @@ function SinoDePedidoNovo() {
           .get(id)
           .then((completo) => {
             const resultado = imprimirComanda(completo, restaurant);
-            // window.open pode ser bloqueado pelo navegador (ex: pop-up sem
-            // permissão fixa) sem lançar erro nenhum — sem este checagem,
-            // a comanda falha e ninguém no balcão fica sabendo.
+            // A comanda pode falhar sem lançar erro nenhum (o navegador se
+            // recusa a preparar o documento). Sem esta checagem, ela
+            // simplesmente não sai e ninguém no balcão fica sabendo.
             if (!resultado.ok) {
               toast.error(
                 `Não consegui imprimir a comanda do ${code} (${resultado.motivo}). Imprima pelo pedido.`
