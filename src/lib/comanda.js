@@ -71,12 +71,28 @@ export function htmlDaComanda(order, restaurante = {}) {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
 <title>Comanda ${escapar(order.code)}</title>
 <style>
-  /* Bobina térmica de 80 mm. Sem isto o navegador assume A4. */
-  @page { size: 80mm auto; margin: 3mm; }
+  /* Bobina termica de 80 mm. Sem isto o navegador assume A4.
+   *
+   * MARGEM ZERO, E O ESPACO VEM DO PADDING DO BODY
+   *
+   * O navegador carimba cabecalho e rodape proprios — titulo da pagina em
+   * cima, ENDERECO DA PAGINA embaixo — e so faz isso quando o @page deixa
+   * margem para eles. Com margem de 3mm a comanda saia com o caminho do
+   * painel impresso no pe: o endereco da area de administracao, em papel,
+   * dentro do pacote do cliente.
+   *
+   * Zerar a margem do @page e o que apaga os dois. O respiro que a termica
+   * precisa volta como padding do body, que e conteudo — o navegador nao usa
+   * padding para desenhar rodape nenhum.
+   *
+   * (Sem crases neste comentario de proposito: ele vive dentro de um template
+   * literal, e uma crase aqui encerraria a string.) */
+  @page { size: 80mm auto; margin: 0; }
 
   body {
     font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 12px; line-height: 1.35; color: #000; margin: 0;
+    font-size: 12px; line-height: 1.35; color: #000;
+    margin: 0; padding: 3mm;
   }
   h1 { font-size: 15px; margin: 0; letter-spacing: 1px; }
   .codigo { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
@@ -300,7 +316,7 @@ export function imprimirComanda(order, restaurante) {
 
     const sobrescreveAltura = doc.createElement('style');
     // Depois no cascade do que o @page original em htmlDaComanda, então vence.
-    sobrescreveAltura.textContent = `@page { size: 80mm ${alturaEscolhida}mm; margin: 3mm; }`;
+    sobrescreveAltura.textContent = `@page { size: 80mm ${alturaEscolhida}mm; margin: 0; }`;
     doc.head.appendChild(sobrescreveAltura);
 
     janela.onafterprint = remover;
