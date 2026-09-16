@@ -201,6 +201,9 @@ const ALTURAS_PADRAO_MM = [210, 279];
 /** Onde fica a lista personalizada deste aparelho. */
 const CHAVE_ALTURAS = 'sushiart.comanda-alturas';
 
+/** Última medição, para consultar depois sem precisar do console aberto. */
+const CHAVE_MEDIDA = 'sushiart.comanda-ultima-medida';
+
 /**
  * Os tamanhos de papel que ESTE aparelho pode usar.
  *
@@ -323,8 +326,11 @@ export function imprimirComanda(order, restaurante) {
     // preset (pedido enorme, incomum), usa o maior mesmo — melhor cortar o fim
     // de uma comanda gigante do que não imprimir nada.
     const alturas = alturasSuportadasMm();
+
+    // Quanto o conteúdo realmente ocupa, antes de arredondar para um preset.
+    const conteudoMm = () => Math.ceil(doc.body.scrollHeight * PX_PARA_MM) + FOLGA_MM;
     const medir = () => {
-      const mm = Math.ceil(doc.body.scrollHeight * PX_PARA_MM) + FOLGA_MM;
+      const mm = conteudoMm();
       return alturas.find((h) => h >= mm) ?? alturas[alturas.length - 1];
     };
 
@@ -354,6 +360,32 @@ export function imprimirComanda(order, restaurante) {
         promo.style.display = '';
         if (separador?.tagName === 'HR') separador.style.display = '';
       }
+    }
+
+    // ----------------------------------------------------------------------
+    // A medida, para quem estiver ajustando o tamanho do papel
+    //
+    // O papel é sempre um dos presets do driver, e o conteúdo quase nunca bate
+    // exatamente num deles — a diferença sai como sobra em branco no fim.
+    // Saber os dois números transforma "sobrou um palmo" em "sobrou 42 mm, o
+    // próximo preset a testar é 180".
+    //
+    // Fica no console (para quem estiver com o F12 aberto durante o ajuste) e
+    // também gravado, porque durante o serviço ninguém vai estar olhando o
+    // console na hora exata em que a comanda sai:
+    //
+    //     localStorage.getItem('sushiart.comanda-ultima-medida')
+    // ----------------------------------------------------------------------
+    const usados = conteudoMm();
+    const sobra = alturaEscolhida - usados;
+    const resumo = `conteúdo ${usados}mm · papel ${alturaEscolhida}mm · sobra ${sobra}mm`;
+
+    try {
+      console.info(`[comanda] ${resumo} · tamanhos disponíveis: ${alturas.join(', ')}mm`);
+      window.localStorage.setItem(CHAVE_MEDIDA, resumo);
+    } catch {
+      // Console ou storage indisponível. É diagnóstico, não pode impedir a
+      // comanda de sair.
     }
 
     const sobrescreveAltura = doc.createElement('style');
