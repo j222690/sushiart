@@ -286,6 +286,15 @@ export default function AdminLayout() {
           >
             <LogOut size={16} /> Sair
           </button>
+
+          {/* Qual codigo esta rodando AQUI.
+              A janela do balcao nao recarrega sozinha, entao ela pode ficar
+              horas numa versao antiga sem dar sinal. Com isto a mostra, basta
+              olhar: se o numero nao bate com o que foi publicado, e so
+              recarregar a pagina. */}
+          <div className="mt-3 px-3.5 text-[10px] text-cream-faint">
+            versao {__VERSAO__}
+          </div>
         </div>
       </aside>
 
